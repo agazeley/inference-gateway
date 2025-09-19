@@ -1,0 +1,14 @@
+[package]
+name = "inference-gateway"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = "0.8.4"
+env_logger = "0.11.8"
+log = "0.4.28"
+serde = { version = "1.0.225", features = ["serde_derive"] }
+serde_json = "1.0.145"
+tokio = { version = "1.47.1", features = ["full"] }
+tower = { version = "0.5.2", features = ["timeout"] }
+tower-http = { version = "0.6.6", features = ["trace", "propagate-header"] }
