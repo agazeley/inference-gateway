@@ -1,4 +1,4 @@
-use inference_gateway::{api, app::App};
+use inference_gateway::{api, server::Server};
 
 #[tokio::main]
 async fn main() {
@@ -7,9 +7,9 @@ async fn main() {
         .init();
 
     let addr = "0.0.0.0:3000";
-    let mut app = App::default();
-    
+    let mut srv = Server::default();
+
     let api_router = api::get_router();
-    app.add_router("/api/v1", api_router);
-    app.serve(addr.to_string()).await;
+    srv.add_router("/api/v1", api_router);
+    srv.serve(addr.to_string()).await;
 }

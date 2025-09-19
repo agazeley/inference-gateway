@@ -1,8 +1,6 @@
 pub mod handlers;
 
-use axum::{
-    http::HeaderName, routing::get, Extension, Router
-};
+use axum::{Extension, Router, http::HeaderName, routing::get};
 use log::{debug, error, info};
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
@@ -12,7 +10,7 @@ use tower::ServiceBuilder;
 use tower_http::{propagate_header::PropagateHeaderLayer, trace::TraceLayer};
 
 #[derive(Serialize, Copy, Clone, PartialEq, Debug)]
-pub enum AppStatus {
+pub enum ServerStatus {
     None,
     Starting,
     Stopped,
@@ -20,13 +18,13 @@ pub enum AppStatus {
     // Unhealthy, // TODO: find out what unhealthy state is and make a way to set it
 }
 
-pub struct App {
+pub struct Server {
     pub name: String,
-    pub status: AppStatus,
+    pub status: ServerStatus,
     router: Router,
 }
 
-impl Default for App {
+impl Default for Server {
     fn default() -> Self {
         // Create our service
         let service = ServiceBuilder::new()
@@ -42,36 +40,35 @@ impl Default for App {
             .layer(service);
         Self {
             name: String::from("inference-gateway"),
-            status: AppStatus::None,
+            status: ServerStatus::None,
             router,
         }
     }
 }
 
-impl App {
-
-    pub fn add_router(&mut self, path: &str, router: Router){
+impl Server {
+    pub fn add_router(&mut self, path: &str, router: Router) {
         self.router = self.router.clone().nest(path, router);
     }
 
     pub async fn serve(mut self, addr: String) {
         // Set initial status to Starting
-        self.status = AppStatus::Starting;
+        self.status = ServerStatus::Starting;
         let router = self.router.clone();
         let shared_state = Arc::new(Mutex::new(self));
 
         // Create router with shared state
         let router = router.clone().layer(Extension(shared_state.clone()));
-        
+
         debug!("Initialized state");
 
         // Set status to Running before starting the server
         {
             let mut state_guard = shared_state.lock().unwrap();
-            state_guard.status = AppStatus::Running;
+            state_guard.status = ServerStatus::Running;
         }
 
-        // run our app with hyper, listening globally on port 3000
+        // run our app with hyper
         let listener = match tokio::net::TcpListener::bind(addr.clone()).await {
             Ok(listener) => listener,
             Err(e) => {
@@ -90,7 +87,7 @@ impl App {
         // Set status to Stopped once we have stopped the server
         {
             let mut state_guard = shared_state.lock().unwrap();
-            state_guard.status = AppStatus::Stopped;
+            state_guard.status = ServerStatus::Stopped;
         }
     }
 }

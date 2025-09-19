@@ -1,15 +1,11 @@
-use axum::{http::StatusCode, routing::post, Json, Router};
+use axum::{Json, Router, http::StatusCode, routing::post};
 use log::info;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
-
-
-pub fn get_router() -> Router{
+pub fn get_router() -> Router {
     Router::new().route("/inference", post(post_inference))
 }
-
-
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct PostInferenceRequest {
