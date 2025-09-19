@@ -1,8 +1,7 @@
 use std::sync::{Arc, MutexGuard};
 
-use axum::{Json, extract::State, http::StatusCode};
-use log::info;
-use serde::{Deserialize, Serialize};
+use axum::{http::StatusCode, Extension, Json};
+use serde::{ Serialize};
 use serde_json::{Value, json};
 use std::sync::Mutex;
 
@@ -24,12 +23,12 @@ impl AppStatusResponse {
 }
 
 // handlers
-pub async fn healthz(State(state): State<Arc<Mutex<App>>>) -> Json<Value> {
+pub async fn healthz(Extension(state): Extension<Arc<Mutex<App>>>) -> Json<Value> {
     let state_guard = state.lock().unwrap();
     Json(json!(AppStatusResponse::from_state(state_guard)))
 }
 
-pub async fn readyz(State(state): State<Arc<Mutex<App>>>) -> (StatusCode, Json<Value>) {
+pub async fn readyz(Extension(state): Extension<Arc<Mutex<App>>>) -> (StatusCode, Json<Value>) {
     let state_guard = state.lock().unwrap();
     if state_guard.status != AppStatus::Running {
         return (
@@ -41,17 +40,4 @@ pub async fn readyz(State(state): State<Arc<Mutex<App>>>) -> (StatusCode, Json<V
         StatusCode::OK,
         Json(json!(AppStatusResponse::from_state(state_guard))),
     )
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct PostInferenceRequest {
-    text: String,
-}
-
-#[derive(Serialize, Debug)]
-pub struct PostInferenceResponse {}
-
-pub async fn post_inference(Json(req): Json<PostInferenceRequest>) -> (StatusCode, Json<Value>) {
-    info!("Inference text: {}", req.text);
-    (StatusCode::OK, Json(json!(PostInferenceResponse {})))
 }

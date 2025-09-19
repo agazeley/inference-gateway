@@ -1,19 +1,15 @@
 pub mod handlers;
 
 use axum::{
-    Router,
-    http::HeaderName,
-    routing::{get, post},
+    http::HeaderName, routing::get, Extension, Router
 };
-use log::{error, info};
+use log::{debug, error, info};
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
 
 use handlers::{healthz, readyz};
 use tower::ServiceBuilder;
 use tower_http::{propagate_header::PropagateHeaderLayer, trace::TraceLayer};
-
-use crate::app::handlers::post_inference;
 
 #[derive(Serialize, Copy, Clone, PartialEq, Debug)]
 pub enum AppStatus {
@@ -27,27 +23,11 @@ pub enum AppStatus {
 pub struct App {
     pub name: String,
     pub status: AppStatus,
+    router: Router,
 }
 
 impl Default for App {
     fn default() -> Self {
-        Self {
-            name: String::from("inference-gateway"),
-            status: AppStatus::None,
-        }
-    }
-}
-
-impl App {
-    pub async fn serve(self, addr: String) {
-        let shared_state = Arc::new(Mutex::new(self));
-
-        // Set initial status to Starting
-        {
-            let mut state_guard = shared_state.lock().unwrap();
-            state_guard.status = AppStatus::Starting;
-        }
-
         // Create our service
         let service = ServiceBuilder::new()
             // High level logging of requests and responses
@@ -56,16 +36,34 @@ impl App {
             .layer(PropagateHeaderLayer::new(HeaderName::from_static(
                 "x-request-id",
             )));
-
-        let api_router = Router::new().route("/inference", post(post_inference));
-
-        // build our application with a single route
-        let app = Router::new()
-            .nest("/api/v1", api_router)
+        let router = Router::new()
             .route("/healthz", get(healthz))
             .route("/readyz", get(readyz))
-            .layer(service)
-            .with_state(shared_state.clone());
+            .layer(service);
+        Self {
+            name: String::from("inference-gateway"),
+            status: AppStatus::None,
+            router,
+        }
+    }
+}
+
+impl App {
+
+    pub fn add_router(&mut self, path: &str, router: Router){
+        self.router = self.router.clone().nest(path, router);
+    }
+
+    pub async fn serve(mut self, addr: String) {
+        // Set initial status to Starting
+        self.status = AppStatus::Starting;
+        let router = self.router.clone();
+        let shared_state = Arc::new(Mutex::new(self));
+
+        // Create router with shared state
+        let router = router.clone().layer(Extension(shared_state.clone()));
+        
+        debug!("Initialized state");
 
         // Set status to Running before starting the server
         {
@@ -84,7 +82,7 @@ impl App {
 
         info!("Server starting on {}", addr);
 
-        match axum::serve(listener, app).await {
+        match axum::serve(listener, router).await {
             Ok(_) => info!("Server shutdown gracefully"),
             Err(e) => error!("Server error: {}", e),
         }
