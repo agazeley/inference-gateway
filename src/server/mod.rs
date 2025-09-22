@@ -1,13 +1,18 @@
 pub mod handlers;
 
-use axum::{Extension, Router, http::HeaderName, routing::get};
+use axum::{Extension, Router, routing::get};
 use log::{debug, error, info};
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
 
 use handlers::{healthz, readyz};
 use tower::ServiceBuilder;
-use tower_http::{propagate_header::PropagateHeaderLayer, trace::TraceLayer};
+
+use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
+use tower_http::trace::{
+    DefaultMakeSpan, DefaultOnFailure, DefaultOnRequest, DefaultOnResponse, TraceLayer,
+};
+use tracing::Level;
 
 #[derive(Serialize, Copy, Clone, PartialEq, Debug)]
 pub enum ServerStatus {
@@ -31,15 +36,13 @@ impl Default for Server {
             // High level logging of requests and responses
             .layer(TraceLayer::new_for_http())
             // Propagate `X-Request-Id`s from requests to responses
-            .layer(PropagateHeaderLayer::new(HeaderName::from_static(
-                "x-request-id",
-            )));
+            ;
         let router = Router::new()
             .route("/healthz", get(healthz))
             .route("/readyz", get(readyz))
             .layer(service);
         Self {
-            name: String::from("inference-gateway"),
+            name: "inference-gateway".to_string(),
             status: ServerStatus::None,
             router,
         }
@@ -58,7 +61,32 @@ impl Server {
         let shared_state = Arc::new(Mutex::new(self));
 
         // Create router with shared state
-        let router = router.clone().layer(Extension(shared_state.clone()));
+        let router = router
+            .clone()
+            .layer(Extension(shared_state.clone()))
+            // Add request-id layers (optional but useful)
+            .layer(PropagateRequestIdLayer::x_request_id())
+            .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
+            // Add request/response logging
+            .layer(
+                TraceLayer::new_for_http()
+                    // log when the request is received
+                    .on_request(DefaultOnRequest::new().level(Level::INFO))
+                    // include method, uri, version, and request-id in the span
+                    .make_span_with(
+                        DefaultMakeSpan::new()
+                            .level(Level::INFO)
+                            .include_headers(false), // set true if you want headers in the span
+                    )
+                    // log when the response is sent (includes latency)
+                    .on_response(
+                        DefaultOnResponse::new()
+                            .level(Level::INFO)
+                            .include_headers(false),
+                    )
+                    // log failures (timeouts, errors)
+                    .on_failure(DefaultOnFailure::new().level(Level::ERROR)),
+            );
 
         debug!("Initialized state");
 
