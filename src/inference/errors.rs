@@ -3,7 +3,7 @@ use thiserror::Error;
 /// Result type alias
 pub type Result<T> = std::result::Result<T, InferenceError>;
 
-/// Main error type
+/// Main error type for the inference lib.
 #[derive(Error, Debug)]
 pub enum InferenceError {
     /// ONNX Runtime errors

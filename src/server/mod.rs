@@ -15,7 +15,7 @@ use tower_http::trace::{
 use tracing::Level;
 
 #[derive(Serialize, Copy, Clone, PartialEq, Debug)]
-pub enum ServerStatus {
+enum ServerStatus {
     None,
     Starting,
     Stopped,
@@ -24,8 +24,8 @@ pub enum ServerStatus {
 }
 
 pub struct Server {
-    pub name: String,
-    pub status: ServerStatus,
+    name: String,
+    status: ServerStatus,
     router: Router,
 }
 
@@ -50,10 +50,29 @@ impl Default for Server {
 }
 
 impl Server {
+    /// Adds a new router to the server at the specified path.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - A string slice that specifies the path where the router will be nested.
+    /// * `router` - The `Router` instance to be added to the server.
+    ///
     pub fn add_router(&mut self, path: &str, router: Router) {
         self.router = self.router.clone().nest(path, router);
     }
 
+    /// Starts the server and begins serving requests on the specified address.
+    ///
+    /// # Arguments
+    ///
+    /// * `addr` - A `String` specifying the address (e.g., "127.0.0.1:8080") where the server will listen for incoming requests.
+    ///
+    /// # Behavior
+    ///
+    /// - Sets the server status to `Starting` before initializing.
+    /// - Configures middleware layers for request/response logging, request ID propagation, and error handling.
+    /// - Sets the server status to `Running` once the server is ready to accept requests.
+    /// - Updates the server status to `Stopped` after the server shuts down.
     pub async fn serve(mut self, addr: String) {
         // Set initial status to Starting
         self.status = ServerStatus::Starting;
@@ -96,7 +115,7 @@ impl Server {
             state_guard.status = ServerStatus::Running;
         }
 
-        // run our app with hyper
+        // Run our app with hyper
         let listener = match tokio::net::TcpListener::bind(addr.clone()).await {
             Ok(listener) => listener,
             Err(e) => {
@@ -106,7 +125,6 @@ impl Server {
         };
 
         info!("Server starting on {}", addr);
-
         match axum::serve(listener, router).await {
             Ok(_) => info!("Server shutdown gracefully"),
             Err(e) => error!("Server error: {}", e),

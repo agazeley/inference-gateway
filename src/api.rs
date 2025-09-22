@@ -10,6 +10,13 @@ use crate::inference::llm::{
     LLM, TextGenerationConfig, load_default_model, load_default_tokenizer,
 };
 
+/// Creates and returns an Axum `Router` configured with the necessary routes and layers.
+///
+/// This function initializes the default language model and tokenizer, wraps them in a
+/// thread-safe `Arc<Mutex<LLM>>`, and sets up the `/inference` endpoint. The shared model
+/// is made accessible to the endpoint via the `Extension` layer.
+///
+/// Returns axum Router or an Error.
 pub fn get_router() -> Result<Router> {
     let model = load_default_model()?;
     let tokenizer = load_default_tokenizer()?;
@@ -25,16 +32,55 @@ pub fn get_router() -> Result<Router> {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct PostInferenceRequest {
+struct PostInferenceRequest {
     text: String,
 }
 
 #[derive(Serialize, Debug)]
-pub struct PostInferenceResponse {
+struct PostInferenceResponse {
     text: String,
 }
 
-pub async fn post_inference(
+/// Handles POST requests to the `/inference` endpoint.
+///
+/// This asynchronous function takes a JSON payload containing a `text` field,
+/// processes it using a shared language model, and returns a generated response
+/// as JSON. The function uses a mutex to ensure thread-safe access to the shared
+/// language model.
+///
+/// # Arguments
+///
+/// * `Extension(llm)` - An `Extension` layer providing access to the shared
+///   `Arc<Mutex<LLM>>` instance, which represents the language model.
+/// * `Json(req)` - A `Json`-deserialized `PostInferenceRequest` containing the
+///   input text for inference.
+///
+/// # Returns
+///
+/// A tuple containing:
+/// * `StatusCode` - The HTTP status code indicating the result of the operation.
+/// * `Json<Value>` - A JSON response containing either the generated text or
+///   an error message.
+///
+/// # Errors
+///
+/// Returns a `500 Internal Server Error` status code if the language model
+/// fails to generate a response.
+///
+/// # Example
+///
+/// ```json
+/// // Request
+/// {
+///   "text": "Hello, world!"
+/// }
+///
+/// // Response
+/// {
+///   "text": "Hello, world! How can I assist you today?"
+/// }
+/// ```
+async fn post_inference(
     Extension(llm): Extension<Arc<Mutex<LLM>>>,
     Json(req): Json<PostInferenceRequest>,
 ) -> (StatusCode, Json<Value>) {
