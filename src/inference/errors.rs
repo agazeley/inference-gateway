@@ -1,14 +1,18 @@
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 /// Result type alias
 pub type Result<T> = std::result::Result<T, InferenceError>;
 
 /// Main error type for the inference lib.
-#[derive(Error, Debug)]
+#[derive(ThisError, Debug)]
 pub enum InferenceError {
     /// ONNX Runtime errors
     #[error("ONNX Runtime error: {0}")]
     OnnxRuntime(#[from] ort::Error),
+
+    // Generation errors
+    #[error("Text generation error: {0}")]
+    TextGenerationError(String),
 
     /// Tokenization errors
     #[error("Tokenization error: {0}")]

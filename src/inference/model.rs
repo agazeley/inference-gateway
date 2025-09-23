@@ -4,10 +4,12 @@ use ort::{
     session::{Session, SessionInputs, SessionOutputs, builder::GraphOptimizationLevel},
 };
 
+const DEFAULT_MODEL_NAME: &str = "unknown";
 const DEFAULT_MODEL_PATH: &str = "data/model.onnx";
 
 #[derive(Debug)]
 pub struct TextGenerationModelConfig {
+    pub model_name: String,
     pub model_path: String,
     pub intra_threads: usize,
     pub optimization_level: GraphOptimizationLevel,
@@ -16,6 +18,7 @@ pub struct TextGenerationModelConfig {
 impl Default for TextGenerationModelConfig {
     fn default() -> Self {
         Self {
+            model_name: DEFAULT_MODEL_NAME.to_string(),
             model_path: DEFAULT_MODEL_PATH.to_string(),
             intra_threads: 4,
             optimization_level: GraphOptimizationLevel::Level3,
@@ -24,14 +27,17 @@ impl Default for TextGenerationModelConfig {
 }
 
 pub struct TextGenerationModel {
+    pub name: String,
     session: Session,
 }
 
 impl TextGenerationModel {
     pub fn new(cfg: TextGenerationModelConfig) -> Result<Self> {
-        let mut builder = Session::builder()?;
+        let mut builder = Session::builder()?
+            .with_optimization_level(cfg.optimization_level)?
+            .with_intra_threads(cfg.intra_threads)?;
 
-        // Register with the cuda provider if it exists
+        // Register CUDA provider if available
         let cuda = CUDAExecutionProvider::default();
         if cuda.is_available().unwrap_or(false) {
             if let Err(e) = cuda.register(&mut builder) {
@@ -41,21 +47,15 @@ impl TextGenerationModel {
             }
         }
 
-        // Apply configuration options
-        let builder = builder
-            .with_optimization_level(cfg.optimization_level)?
-            .with_intra_threads(cfg.intra_threads)?;
-
-        // In dev mode we often use http models (they are cached)
-        // Check for http path URL and load from there - otherwise local file system
-        if cfg.model_path.starts_with("http") {
-            return Ok(Self {
-                session: builder.commit_from_url(cfg.model_path)?,
-            });
-        }
-
+        // Load model from URL or local file
+        let session = if cfg.model_path.starts_with("http") {
+            builder.commit_from_url(cfg.model_path)?
+        } else {
+            builder.commit_from_file(cfg.model_path)?
+        };
         Ok(Self {
-            session: builder.commit_from_file(cfg.model_path)?,
+            session,
+            name: cfg.model_name,
         })
     }
 
