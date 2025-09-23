@@ -11,7 +11,6 @@ async fn main() {
         )
         .with(fmt::layer().compact())
         .init();
-
     let addr = "0.0.0.0:3000";
     let mut srv = Server::default();
 

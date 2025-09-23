@@ -149,7 +149,6 @@ impl LLM {
                         *p /= sum_p;
                     }
                 }
-                debug!("Retained {:?}", probs)
             } else {
                 return Err(InferenceError::TextGenerationError(format!(
                     "Invalid top-p parameter '{}'",

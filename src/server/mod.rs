@@ -1,6 +1,7 @@
 pub mod handlers;
 
 use axum::{Extension, Router, routing::get};
+use axum_prometheus::{Handle, MakeDefaultHandle, PrometheusMetricLayerBuilder};
 use log::{debug, error, info};
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
@@ -31,18 +32,26 @@ pub struct Server {
 
 impl Default for Server {
     fn default() -> Self {
+        let name = "inference-gateway".to_string();
+        // create metric handler and add prom layer to router
+        let prometheus_layer = PrometheusMetricLayerBuilder::new()
+            .with_prefix(name.clone().replace("-", "_"))
+            .build();
+        let metric_handle = Handle::make_default_handle(Handle::default());
+
         // Create our service
         let service = ServiceBuilder::new()
             // High level logging of requests and responses
-            .layer(TraceLayer::new_for_http())
-            // Propagate `X-Request-Id`s from requests to responses
-            ;
+            .layer(TraceLayer::new_for_http());
+
         let router = Router::new()
             .route("/healthz", get(healthz))
             .route("/readyz", get(readyz))
-            .layer(service);
+            .route("/metrics", get(|| async move { metric_handle.render() }))
+            .layer(service)
+            .layer(prometheus_layer);
         Self {
-            name: "inference-gateway".to_string(),
+            name,
             status: ServerStatus::None,
             router,
         }
