@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use axum::{Extension, Json, http::StatusCode};
-use log::debug;
+use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -97,10 +97,11 @@ pub async fn post_inference(
         match llm_guard.generate(generation_req) {
             Ok(t) => (t, model_name),
             Err(e) => {
+                error!("Generate error: {}", e);
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(json!({
-                        "error": format!("generation failed: {e}"),
+                        "error": "generate error",
                     })),
                 );
             }
