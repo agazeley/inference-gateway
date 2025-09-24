@@ -3,15 +3,17 @@ use ort::{
     execution_providers::{CUDAExecutionProvider, ExecutionProvider},
     session::{Session, SessionInputs, SessionOutputs, builder::GraphOptimizationLevel},
 };
+use serde::Serialize;
 
 const DEFAULT_MODEL_NAME: &str = "unknown";
 const DEFAULT_MODEL_PATH: &str = "data/model.onnx";
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct TextGenerationModelConfig {
     pub model_name: String,
     pub model_path: String,
     pub intra_threads: usize,
+    #[serde(skip_serializing)]
     pub optimization_level: GraphOptimizationLevel,
 }
 

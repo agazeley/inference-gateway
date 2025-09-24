@@ -7,21 +7,28 @@ use tokenizers::Tokenizer;
 use crate::inference::{
     errors::{InferenceError, Result},
     model::{TextGenerationModel, TextGenerationModelConfig},
+    prompting::{NO_OP, PromptTemplate},
     tokenization::{TextGenerationTokenizerConfig, new_tokenizer},
 };
 
-// TODO: Need a way to configure the defaults dynamically
+const DEFAULT_MODEL_NAME_VAR: &str = "INFERENCE_DEFAULT_MODEL_NAME";
+const DEFAULT_MODEL_PATH_VAR: &str = "INFERENCE_DEFAULT_MODEL_PATH";
+const DEFAULT_TOKENIZER_VAR: &str = "INFERENCE_DEFAULT_TOKENIZER";
+
 // https://huggingface.co/openai-community/gpt2/resolve/main/tokenizer.json
 pub fn load_default_model() -> Result<TextGenerationModel> {
-    info!("Loading model...");
-    let model_cfg = TextGenerationModelConfig {
-        model_name: "gpt2".to_string(),
-        model_path: "https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/gpt2.onnx".to_string(),
+    let cfg = TextGenerationModelConfig {
+        model_name: get_env(DEFAULT_MODEL_NAME_VAR, "gpt2"),
+        model_path: get_env(
+            DEFAULT_MODEL_PATH_VAR,
+            "https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/gpt2.onnx",
+        ),
         intra_threads: 4,
         optimization_level: GraphOptimizationLevel::Level3,
     };
+    info!("Loading model: {:?}", serde_json::to_string(&cfg).unwrap());
 
-    match TextGenerationModel::new(model_cfg) {
+    match TextGenerationModel::new(cfg) {
         Ok(m) => {
             debug!("Model loaded");
             Ok(m)
@@ -31,11 +38,14 @@ pub fn load_default_model() -> Result<TextGenerationModel> {
 }
 
 pub fn load_default_tokenizer() -> Result<Tokenizer> {
-    info!("Loading tokenizer...");
     let cfg = TextGenerationTokenizerConfig {
-        pretrained_identifier: Some("openai-community/gpt2".to_string()),
+        pretrained_identifier: Some(get_env(DEFAULT_TOKENIZER_VAR, "openai-community/gpt2")),
         filepath: None,
     };
+    info!(
+        "Loading tokenizer: {:?}",
+        serde_json::to_string(&cfg).unwrap()
+    );
     match new_tokenizer(cfg) {
         Ok(t) => {
             debug!("Tokenizer loaded");
@@ -52,6 +62,7 @@ pub struct TextGenerationConfig {
     pub temperature: f32,
     pub top_k: usize,
     pub top_p: Option<f32>,
+    pub template: Option<PromptTemplate>,
 }
 
 impl TextGenerationConfig {
@@ -62,6 +73,7 @@ impl TextGenerationConfig {
             temperature: 0.5,
             top_k: 5,
             top_p: Some(1.0),
+            template: None,
         }
     }
 }
@@ -166,7 +178,9 @@ impl LLM {
             "Generating from: {:?}",
             serde_json::to_string(&req).unwrap()
         );
-        let mut input_tokens = self.tokenize_input(&req.text)?;
+        let template = req.template.as_ref().unwrap_or(&NO_OP);
+        let input = template.apply(&req.text);
+        let mut input_tokens = self.tokenize_input(&input)?;
         let mut generated_tokens = Vec::new();
         let mut rng = rand::rng();
 
@@ -243,4 +257,8 @@ impl LLM {
         let top_k_size = top_k.min(probabilities.len());
         probabilities[rng.random_range(0..top_k_size)].0 as i64
     }
+}
+
+fn get_env(key: &str, default: &str) -> String {
+    std::env::var(key).unwrap_or_else(|_| default.to_string())
 }

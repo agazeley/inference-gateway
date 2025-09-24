@@ -5,7 +5,10 @@ use log::debug;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::inference::llm::{LLM, TextGenerationConfig};
+use crate::inference::{
+    llm::{LLM, TextGenerationConfig},
+    prompting::CHAT,
+};
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct PostInferenceRequest {
@@ -86,7 +89,12 @@ pub async fn post_inference(
     let (generated, model_name) = {
         let mut llm_guard = llm.lock().unwrap();
         let model_name = llm_guard.model_name();
-        match llm_guard.generate(TextGenerationConfig::from(req)) {
+
+        // We want to chat so lets use the chat template
+        let mut generation_req = TextGenerationConfig::from(req);
+        generation_req.template = Some(CHAT);
+
+        match llm_guard.generate(generation_req) {
             Ok(t) => (t, model_name),
             Err(e) => {
                 return (

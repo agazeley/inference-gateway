@@ -16,8 +16,8 @@ use std::{
 ///
 /// Returns axum Router or an Error.
 pub fn get_router() -> Result<Router, Error> {
-    let model = load_default_model().map_err(|_| std::fmt::Error)?;
-    let tokenizer = load_default_tokenizer().map_err(|_| std::fmt::Error)?;
+    let model = load_default_model().unwrap();
+    let tokenizer = load_default_tokenizer().unwrap();
     let language_model = LLM::new(model, tokenizer);
     let shared_model = Arc::new(Mutex::new(language_model));
 
