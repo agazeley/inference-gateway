@@ -1,12 +1,12 @@
 use log::{debug, info, trace};
-use ort::{inputs, session::builder::GraphOptimizationLevel, value::TensorRef};
+use ort::{inputs, session::builder::GraphOptimizationLevel, value::{TensorRef, Value}};
 use rand::Rng;
 use serde::Serialize;
 use tokenizers::Tokenizer;
 
 use crate::inference::{
     errors::{InferenceError, Result},
-    model::{TextGenerationModel, TextGenerationModelConfig},
+    model::{AutoRegressiveModel, AutoRegressiveModelConfig},
     prompting::{NO_OP, PromptTemplate},
     tokenization::{TextGenerationTokenizerConfig, new_tokenizer},
 };
@@ -16,8 +16,8 @@ const DEFAULT_MODEL_PATH_VAR: &str = "INFERENCE_DEFAULT_MODEL_PATH";
 const DEFAULT_TOKENIZER_VAR: &str = "INFERENCE_DEFAULT_TOKENIZER";
 
 // https://huggingface.co/openai-community/gpt2/resolve/main/tokenizer.json
-pub fn load_default_model() -> Result<TextGenerationModel> {
-    let cfg = TextGenerationModelConfig {
+pub fn load_default_model() -> Result<AutoRegressiveModel> {
+    let cfg = AutoRegressiveModelConfig {
         model_name: get_env(DEFAULT_MODEL_NAME_VAR, "gpt2"),
         model_path: get_env(
             DEFAULT_MODEL_PATH_VAR,
@@ -28,7 +28,7 @@ pub fn load_default_model() -> Result<TextGenerationModel> {
     };
     info!("Loading model: {:?}", serde_json::to_string(&cfg).unwrap());
 
-    match TextGenerationModel::new(cfg) {
+    match AutoRegressiveModel::new(cfg) {
         Ok(m) => {
             debug!("Model loaded");
             Ok(m)
@@ -79,12 +79,12 @@ impl TextGenerationConfig {
 }
 
 pub struct LLM {
-    model: TextGenerationModel,
+    model: AutoRegressiveModel,
     tokenizer: Tokenizer,
 }
 
 impl LLM {
-    pub fn new(model: TextGenerationModel, tokenizer: Tokenizer) -> Self {
+    pub fn new(model: AutoRegressiveModel, tokenizer: Tokenizer) -> Self {
         Self { model, tokenizer }
     }
 
@@ -201,6 +201,7 @@ impl LLM {
     }
 
     fn run_inference(&mut self, tokens: &[i64]) -> Result<Vec<(usize, f32)>> {
+        // TODO: make this dynamic
         // Raw tensor construction takes a tuple of (shape, data).
         // The model expects our input to have shape [B, _, S]
         //
@@ -223,6 +224,7 @@ impl LLM {
             }
         };
 
+        // TODO: Make this dynamic
         // The output tensor will have shape [B, _, S, V]
         // We want only the probabilities for the last token in this sequence, which will be the next most likely token
         // according to the model

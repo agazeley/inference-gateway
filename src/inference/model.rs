@@ -1,15 +1,17 @@
 use crate::inference::errors::{InferenceError, Result};
-use log::debug;
+use crate::inference::inputs::DynamicInputBuilder;
 use ort::{
     execution_providers::{CUDAExecutionProvider, ExecutionProvider},
     session::{Session, SessionInputs, SessionOutputs, builder::GraphOptimizationLevel},
+    value::Value,
 };
 use serde::Serialize;
+
 const DEFAULT_MODEL_NAME: &str = "unknown";
 const DEFAULT_MODEL_PATH: &str = "data/model.onnx";
 
 #[derive(Debug, Serialize)]
-pub struct TextGenerationModelConfig {
+pub struct AutoRegressiveModelConfig {
     pub model_name: String,
     pub model_path: String,
     pub intra_threads: usize,
@@ -17,30 +19,14 @@ pub struct TextGenerationModelConfig {
     pub optimization_level: GraphOptimizationLevel,
 }
 
-impl Default for TextGenerationModelConfig {
-    fn default() -> Self {
-        Self {
-            model_name: DEFAULT_MODEL_NAME.to_string(),
-            model_path: DEFAULT_MODEL_PATH.to_string(),
-            intra_threads: 4,
-            optimization_level: GraphOptimizationLevel::Level3,
-        }
-    }
-}
-
-pub struct TextGenerationModel {
-    pub name: String,
-    session: Session,
-}
-
-impl TextGenerationModel {
-    pub fn new(cfg: TextGenerationModelConfig) -> Result<Self> {
+impl AutoRegressiveModelConfig {
+    pub fn build_session(self) -> Result<Session> {
         let mut builder = Session::builder()?
-            .with_optimization_level(cfg.optimization_level)
+            .with_optimization_level(self.optimization_level)
             .map_err(|e| {
                 InferenceError::ModelLoading(format!("Failed to set optimization level: {}", e))
             })?
-            .with_intra_threads(cfg.intra_threads)
+            .with_intra_threads(self.intra_threads)
             .map_err(|e| {
                 InferenceError::ModelLoading(format!("Failed to set intra threads: {}", e))
             })?;
@@ -56,19 +42,43 @@ impl TextGenerationModel {
         }
 
         // Load model from URL or local file
-        let session = if cfg.model_path.starts_with("http") {
-            builder.commit_from_url(cfg.model_path).map_err(|e| {
+        let session = if self.model_path.starts_with("http") {
+            builder.commit_from_url(self.model_path).map_err(|e| {
                 InferenceError::ModelLoading(format!("Failed to commit from URL: {}", e))
             })?
         } else {
-            builder.commit_from_file(cfg.model_path).map_err(|e| {
+            builder.commit_from_file(self.model_path).map_err(|e| {
                 InferenceError::ModelLoading(format!("Failed to commit from file: {}", e))
             })?
         };
+        Ok(session)
+    }
+}
+
+impl Default for AutoRegressiveModelConfig {
+    fn default() -> Self {
+        Self {
+            model_name: DEFAULT_MODEL_NAME.to_string(),
+            model_path: DEFAULT_MODEL_PATH.to_string(),
+            intra_threads: 4,
+            optimization_level: GraphOptimizationLevel::Level3,
+        }
+    }
+}
+
+pub struct AutoRegressiveModel {
+    pub name: String,
+    session: Session,
+}
+
+impl AutoRegressiveModel {
+    pub fn new(cfg: AutoRegressiveModelConfig) -> Result<Self> {
+        let name = cfg.model_name.clone();
+        let session = cfg.build_session()?;
 
         Ok(Self {
             session,
-            name: cfg.model_name,
+            name,
         })
     }
 
