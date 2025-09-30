@@ -1,11 +1,9 @@
 use crate::inference::errors::{InferenceError, Result};
-
-use serde::Serialize;
 use tokenizers::Tokenizer;
 
 const DEFAULT_TOKENIZER_PATH: &str = "data/tokenizer.json";
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct TextGenerationTokenizerConfig {
     pub filepath: Option<String>,
     pub pretrained_identifier: Option<String>,

@@ -1,12 +1,11 @@
-pub mod handlers;
+mod errors;
+mod handlers;
 
+use crate::api::errors::ApiError;
 use crate::api::handlers::post_inference;
 use crate::inference::llm::{LLM, load_default_model, load_default_tokenizer};
 use axum::{Extension, Router, routing::post};
-use std::{
-    fmt::Error,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 /// Creates and returns an Axum `Router` configured with the necessary routes and layers.
 ///
@@ -15,9 +14,9 @@ use std::{
 /// is made accessible to the endpoint via the `Extension` layer.
 ///
 /// Returns axum Router or an Error.
-pub fn get_router() -> Result<Router, Error> {
-    let model = load_default_model().unwrap();
-    let tokenizer = load_default_tokenizer().unwrap();
+pub fn get_router() -> errors::Result<Router> {
+    let model = load_default_model().map_err(ApiError::InferenceInit)?;
+    let tokenizer = load_default_tokenizer().map_err(ApiError::InferenceInit)?;
     let language_model = LLM::new(model, tokenizer);
     let shared_model = Arc::new(Mutex::new(language_model));
 

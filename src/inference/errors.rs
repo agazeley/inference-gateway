@@ -1,32 +1,44 @@
 use thiserror::Error as ThisError;
 
-/// Result type alias
+// Result type alias
 pub type Result<T> = std::result::Result<T, InferenceError>;
 
-/// Main error type for the inference lib.
+// Main error type for the inference lib.
 #[derive(ThisError, Debug)]
 pub enum InferenceError {
-    /// ONNX Runtime errors
+    // ONNX Runtime errors
     #[error("ONNX Runtime error: {0}")]
     OnnxRuntime(#[from] ort::Error),
 
-    // Generation errors
+    // Error while generating dynamic inputs
+    #[error("Input generation error: {0}")]
+    InputGenerationError(String),
+
+    // Error while generating dynamic outputs
+    #[error("Output generation error: {0}")]
+    OutputGenerationError(String),
+
+    // Error working with model metadata
+    #[error("Model metadata error: {0}")]
+    ModelMetadataError(String),
+
+    // Error while generating text
     #[error("Text generation error: {0}")]
     TextGenerationError(String),
 
-    /// Tokenization errors
+    // Tokenization errors
     #[error("Tokenization error: {0}")]
     Tokenization(String),
 
-    /// Model loading errors
+    // Model loading errors
     #[error("Model loading error: {0}")]
     ModelLoading(String),
 
-    /// Lock acquisition errors
-    #[error("Lock acquisition error: {0}")]
-    LockAcquisition(String),
-
-    /// Configuration errors
+    // Configuration errors
     #[error("Configuration error: {0}")]
     Configuration(String),
+
+    // Unsupported data type errors
+    #[error("Unsupported data type: {0}")]
+    UnsupportedDataType(String),
 }

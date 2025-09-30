@@ -1,7 +1,6 @@
-use log::{debug, info, trace};
-use ort::{inputs, session::builder::GraphOptimizationLevel, value::{TensorRef, Value}};
+use log::{debug, info};
+use ort::session::builder::GraphOptimizationLevel;
 use rand::Rng;
-use serde::Serialize;
 use tokenizers::Tokenizer;
 
 use crate::inference::{
@@ -26,15 +25,8 @@ pub fn load_default_model() -> Result<AutoRegressiveModel> {
         intra_threads: 4,
         optimization_level: GraphOptimizationLevel::Level3,
     };
-    info!("Loading model: {:?}", serde_json::to_string(&cfg).unwrap());
-
-    match AutoRegressiveModel::new(cfg) {
-        Ok(m) => {
-            debug!("Model loaded");
-            Ok(m)
-        }
-        Err(e) => Err(e),
-    }
+    info!("Loading model: {:?}", cfg);
+    AutoRegressiveModel::new(cfg)
 }
 
 pub fn load_default_tokenizer() -> Result<Tokenizer> {
@@ -42,20 +34,11 @@ pub fn load_default_tokenizer() -> Result<Tokenizer> {
         pretrained_identifier: Some(get_env(DEFAULT_TOKENIZER_VAR, "openai-community/gpt2")),
         filepath: None,
     };
-    info!(
-        "Loading tokenizer: {:?}",
-        serde_json::to_string(&cfg).unwrap()
-    );
-    match new_tokenizer(cfg) {
-        Ok(t) => {
-            debug!("Tokenizer loaded");
-            Ok(t)
-        }
-        Err(e) => Err(e),
-    }
+    info!("Loading tokenizer: {:?}", cfg);
+    new_tokenizer(cfg)
 }
 
-#[derive(Serialize)]
+#[derive(Debug)]
 pub struct TextGenerationConfig {
     pub text: String,
     pub max_tokens: i32,
@@ -102,7 +85,6 @@ impl LLM {
         logits: Vec<(usize, f32)>,
         params: &TextGenerationConfig,
     ) -> Result<Vec<(usize, f32)>> {
-        trace!("Processing {} logits", logits.len());
         // Temperature scaling:
         // Divide logits by temperature before softmax.
         // T < 1.0 → sharper distribution (more deterministic).
@@ -168,29 +150,26 @@ impl LLM {
                 )));
             }
         }
-
-        trace!("Processed down to {} logits", probs.len());
         Ok(probs)
     }
 
     pub fn generate(&mut self, req: TextGenerationConfig) -> Result<String> {
-        debug!(
-            "Generating from: {:?}",
-            serde_json::to_string(&req).unwrap()
-        );
+        debug!("Generating from: {:?}", req);
         let template = req.template.as_ref().unwrap_or(&NO_OP);
-        let input = template.apply(&req.text);
+        let input = template.apply(&req.text, "");
         let mut input_tokens = self.tokenize_input(&input)?;
         let mut generated_tokens = Vec::new();
         let mut rng = rand::rng();
 
         for _ in 0..req.max_tokens {
-            let logits = self.run_inference(&input_tokens)?;
+            let output = self.model.run(&input_tokens)?; // TODO: this probaby will not work
+            let logits = output.logits()?;
             let tokens = self.process_logits(logits, &req)?;
             if tokens.is_empty() {
                 break;
             }
-            let token = self.sample_token(&tokens, req.top_k, &mut rng);
+            let top_k_size = req.top_k.min(tokens.len());
+            let token = tokens[rng.random_range(0..top_k_size)].0 as i64;
             input_tokens.push(token);
             generated_tokens.push(token as u32);
         }
@@ -200,64 +179,12 @@ impl LLM {
             .map_err(|e| InferenceError::Tokenization(e.to_string()))
     }
 
-    fn run_inference(&mut self, tokens: &[i64]) -> Result<Vec<(usize, f32)>> {
-        // TODO: make this dynamic
-        // Raw tensor construction takes a tuple of (shape, data).
-        // The model expects our input to have shape [B, _, S]
-        //
-        //    Shape [B, _, S] here:
-        //    B = 1 (batch size is 1 request)
-        //    _ = 1 (sometimes used as number of heads/layers, depends on model’s input signature)
-        //    S = tokens.len() (sequence length = how many tokens you’ve generated so far, including prompt).
-        //
-
-        // Our implementation:
-        let input = TensorRef::from_array_view((vec![1, 1, tokens.len() as i64], tokens))?;
-        let outputs = self.model.run(inputs![input])?;
-        let (dim, mut probabilities) = match outputs["output1"].try_extract_tensor() {
-            Ok((dim, probabilities)) => (dim, probabilities),
-            Err(e) => {
-                return Err(InferenceError::TextGenerationError(format!(
-                    "error extracting tensor: {}",
-                    e
-                )));
-            }
-        };
-
-        // TODO: Make this dynamic
-        // The output tensor will have shape [B, _, S, V]
-        // We want only the probabilities for the last token in this sequence, which will be the next most likely token
-        // according to the model
-        // Output shape = [B, _, S, V]:
-        //    B = 1 batch
-        //    _ = 1 dummy dimension
-        //    S = sequence length
-        //    V = vocab size
-        // That means at each time step, you get a vector of length V representing the logits/probabilities of every possible next token.
-        // You don’t care about the probabilities for earlier positions (you already generated those).
-        //
-        // So you slice into the last V chunk:
-        // The output tensor will have shape [B, _, S, V]
-        // We want only the probabilities for the last token in this sequence, which will be the next most likely token
-        // according to the model
-        let (seq_len, vocab_size) = (dim[2] as usize, dim[3] as usize);
-        probabilities = &probabilities[(seq_len - 1) * vocab_size..];
-        Ok(probabilities.iter().copied().enumerate().collect())
-    }
-
     fn tokenize_input(&self, text: &str) -> Result<Vec<i64>> {
-        let tokens = self.tokenizer.encode(text, false).unwrap();
+        let tokens = self
+            .tokenizer
+            .encode(text, false)
+            .map_err(|e| InferenceError::Tokenization(e.to_string()))?;
         Ok(tokens.get_ids().iter().map(|i| *i as i64).collect())
-    }
-
-    fn sample_token(
-        &self,
-        probabilities: &[(usize, f32)],
-        top_k: usize,
-        rng: &mut impl Rng,
-    ) -> i64 {
-        let top_k_size = top_k.min(probabilities.len());
-        probabilities[rng.random_range(0..top_k_size)].0 as i64
     }
 }
 
