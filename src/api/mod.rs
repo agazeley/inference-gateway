@@ -3,7 +3,8 @@ mod handlers;
 
 use crate::api::errors::ApiError;
 use crate::api::handlers::post_inference;
-use crate::inference::llm::{LLM, load_default_model, load_default_tokenizer};
+use crate::inference::llm::LLM;
+use crate::inference::{load_default_model, load_default_tokenizer};
 use axum::{Extension, Router, routing::post};
 use std::sync::{Arc, Mutex};
 

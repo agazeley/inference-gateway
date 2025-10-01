@@ -1,16 +1,16 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use axum::{Extension, Json, http::StatusCode};
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::inference::{
-    llm::{LLM, TextGenerationConfig},
-    prompting::CHAT,
-};
+use crate::inference::llm::{ChatRequest, LLM, Message, TextGenerationParameters};
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct PostInferenceRequest {
     text: String,
     max_tokens: Option<i32>,
@@ -19,20 +19,32 @@ pub struct PostInferenceRequest {
 }
 
 // Implement conversion from API type to internal config
-impl From<PostInferenceRequest> for TextGenerationConfig {
+impl From<PostInferenceRequest> for ChatRequest {
     fn from(req: PostInferenceRequest) -> Self {
-        let mut cfg = Self::new(req.text);
+        Self {
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: req.text,
+            }],
+        }
+    }
+}
+
+// Implement conversion from API type to internal config
+impl From<PostInferenceRequest> for TextGenerationParameters {
+    fn from(req: PostInferenceRequest) -> Self {
+        let mut params = Self::new();
         if req.max_tokens.is_some() {
-            cfg.max_tokens = req.max_tokens.unwrap()
+            params.max_tokens = req.max_tokens.unwrap()
         }
         if req.temperature.is_some() {
-            cfg.temperature = req.temperature.unwrap()
+            params.temperature = req.temperature.unwrap()
         }
         if req.top_p.is_some() {
-            cfg.top_p = req.top_p
+            params.top_p = req.top_p
         }
 
-        cfg
+        params
     }
 }
 
@@ -40,6 +52,7 @@ impl From<PostInferenceRequest> for TextGenerationConfig {
 pub struct PostInferenceResponse {
     text: String,
     model: String,
+    metadata: HashMap<String, String>,
 }
 /// Handles POST requests to the `/inference` endpoint.
 ///
@@ -89,12 +102,9 @@ pub async fn post_inference(
     let (generated, model_name) = {
         let mut llm_guard = llm.lock().unwrap();
         let model_name = llm_guard.model_name();
-
-        // We want to chat so lets use the chat template
-        let mut generation_req = TextGenerationConfig::from(req);
-        generation_req.template = Some(CHAT);
-
-        match llm_guard.generate(generation_req) {
+        let params = TextGenerationParameters::from(req.clone());
+        let chat_request = ChatRequest::from(req);
+        match llm_guard.chat(chat_request, params) {
             Ok(t) => (t, model_name),
             Err(e) => {
                 error!("Generate error: {}", e);
@@ -112,7 +122,8 @@ pub async fn post_inference(
         StatusCode::OK,
         Json(json!(PostInferenceResponse {
             text: generated,
-            model: model_name
+            model: model_name,
+            metadata: HashMap::new()
         })),
     )
 }

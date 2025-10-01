@@ -19,7 +19,7 @@ Inference Gateway provides a scalable HTTP API for text generation with enterpri
 - Text generation with configurable parameters (temperature, top-p, max tokens)
 - Support for multiple model formats via ONNX Runtime
 - Batched inference capabilities
-- Custom prompt templating system
+- Custom prompt templating system, including Jinja-based templates
 
 ### Production Features
 - Prometheus metrics collection
@@ -78,7 +78,8 @@ Configure the service using environment variables:
 **Response:**
 ```json
 {
-  "generated_text": "The future of artificial intelligence looks promising with advances in machine learning...",
+  "model": "mymodel",
+  "text": "The future of artificial intelligence looks promising with advances in machine learning...",
   "metadata": {
     "tokens_generated": 50,
     "processing_time_ms": 245

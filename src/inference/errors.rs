@@ -30,6 +30,9 @@ pub enum InferenceError {
     #[error("Tokenization error: {0}")]
     Tokenization(String),
 
+    #[error("Chat template error: {0}")]
+    ChatTemplateError(String),
+
     // Model loading errors
     #[error("Model loading error: {0}")]
     ModelLoading(String),

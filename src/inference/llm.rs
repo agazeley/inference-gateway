@@ -1,62 +1,46 @@
-use log::{debug, info};
-use ort::session::builder::GraphOptimizationLevel;
+use log::debug;
 use rand::Rng;
-use tokenizers::Tokenizer;
+use serde_derive::Deserialize;
+use serde_derive::Serialize;
 
 use crate::inference::{
     errors::{InferenceError, Result},
-    model::{AutoRegressiveModel, AutoRegressiveModelConfig},
-    prompting::{NO_OP, PromptTemplate},
-    tokenization::{TextGenerationTokenizerConfig, new_tokenizer},
+    model::AutoRegressiveModel,
+    tokenization::Tokenizer,
 };
 
-const DEFAULT_MODEL_NAME_VAR: &str = "INFERENCE_DEFAULT_MODEL_NAME";
-const DEFAULT_MODEL_PATH_VAR: &str = "INFERENCE_DEFAULT_MODEL_PATH";
-const DEFAULT_TOKENIZER_VAR: &str = "INFERENCE_DEFAULT_TOKENIZER";
-
-// https://huggingface.co/openai-community/gpt2/resolve/main/tokenizer.json
-pub fn load_default_model() -> Result<AutoRegressiveModel> {
-    let cfg = AutoRegressiveModelConfig {
-        model_name: get_env(DEFAULT_MODEL_NAME_VAR, "gpt2"),
-        model_path: get_env(
-            DEFAULT_MODEL_PATH_VAR,
-            "https://cdn.pyke.io/0/pyke:ort-rs/example-models@0.0.0/gpt2.onnx",
-        ),
-        intra_threads: 4,
-        optimization_level: GraphOptimizationLevel::Level3,
-    };
-    info!("Loading model: {:?}", cfg);
-    AutoRegressiveModel::new(cfg)
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ChatRequest {
+    pub messages: Vec<Message>,
 }
 
-pub fn load_default_tokenizer() -> Result<Tokenizer> {
-    let cfg = TextGenerationTokenizerConfig {
-        pretrained_identifier: Some(get_env(DEFAULT_TOKENIZER_VAR, "openai-community/gpt2")),
-        filepath: None,
-    };
-    info!("Loading tokenizer: {:?}", cfg);
-    new_tokenizer(cfg)
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Message {
+    pub role: String,
+    pub content: String,
 }
 
 #[derive(Debug)]
-pub struct TextGenerationConfig {
-    pub text: String,
+pub struct TextGenerationParameters {
     pub max_tokens: i32,
     pub temperature: f32,
     pub top_k: usize,
     pub top_p: Option<f32>,
-    pub template: Option<PromptTemplate>,
 }
 
-impl TextGenerationConfig {
-    pub fn new(text: String) -> Self {
+impl Default for TextGenerationParameters {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TextGenerationParameters {
+    pub fn new() -> Self {
         Self {
-            text,
             max_tokens: 1024,
             temperature: 0.5,
             top_k: 5,
             top_p: Some(1.0),
-            template: None,
         }
     }
 }
@@ -80,10 +64,45 @@ impl LLM {
         self.model.name.clone()
     }
 
+    pub fn chat(&mut self, chat: ChatRequest, params: TextGenerationParameters) -> Result<String> {
+        // TODO: we need to get the stuff going for the tokenizer to handle BOS,EOS,UNK tokens
+        let input = self.tokenizer.chat_template
+            .format_request(&chat, true,None,None, None)?;
+        self.generate(input, params)
+    }
+
+    pub fn generate(&mut self, input: String, params: TextGenerationParameters) -> Result<String> {
+        debug!("Generating from: {:?}", params);
+        debug!("Input: {:?}", input);
+        let mut input_tokens = self.tokenize_input(&input)?;
+        let mut generated_tokens = Vec::new();
+        let mut rng = rand::rng();
+
+        for _ in 0..params.max_tokens {
+            let output = self.model.run(&input_tokens)?; // TODO: this probaby will not work
+            let logits = output.logits()?;
+            let tokens = self.process_logits(logits, &params)?;
+            if tokens.is_empty() {
+                break;
+            }
+            let top_k_size = params.top_k.min(tokens.len());
+            let token = tokens[rng.random_range(0..top_k_size)].0 as i64;
+            input_tokens.push(token);
+            generated_tokens.push(token as u32);
+        }
+
+        self.tokenizer.decode(&generated_tokens, true)
+    }
+
+    fn tokenize_input(&self, text: &str) -> Result<Vec<i64>> {
+        let tokens = self.tokenizer.encode(text, false)?;
+        Ok(tokens.get_ids().iter().map(|i| *i as i64).collect())
+    }
+
     fn process_logits(
         &self,
         logits: Vec<(usize, f32)>,
-        params: &TextGenerationConfig,
+        params: &TextGenerationParameters,
     ) -> Result<Vec<(usize, f32)>> {
         // Temperature scaling:
         // Divide logits by temperature before softmax.
@@ -152,42 +171,4 @@ impl LLM {
         }
         Ok(probs)
     }
-
-    pub fn generate(&mut self, req: TextGenerationConfig) -> Result<String> {
-        debug!("Generating from: {:?}", req);
-        let template = req.template.as_ref().unwrap_or(&NO_OP);
-        let input = template.apply(&req.text, "");
-        let mut input_tokens = self.tokenize_input(&input)?;
-        let mut generated_tokens = Vec::new();
-        let mut rng = rand::rng();
-
-        for _ in 0..req.max_tokens {
-            let output = self.model.run(&input_tokens)?; // TODO: this probaby will not work
-            let logits = output.logits()?;
-            let tokens = self.process_logits(logits, &req)?;
-            if tokens.is_empty() {
-                break;
-            }
-            let top_k_size = req.top_k.min(tokens.len());
-            let token = tokens[rng.random_range(0..top_k_size)].0 as i64;
-            input_tokens.push(token);
-            generated_tokens.push(token as u32);
-        }
-
-        self.tokenizer
-            .decode(&generated_tokens, true)
-            .map_err(|e| InferenceError::Tokenization(e.to_string()))
-    }
-
-    fn tokenize_input(&self, text: &str) -> Result<Vec<i64>> {
-        let tokens = self
-            .tokenizer
-            .encode(text, false)
-            .map_err(|e| InferenceError::Tokenization(e.to_string()))?;
-        Ok(tokens.get_ids().iter().map(|i| *i as i64).collect())
-    }
-}
-
-fn get_env(key: &str, default: &str) -> String {
-    std::env::var(key).unwrap_or_else(|_| default.to_string())
 }
