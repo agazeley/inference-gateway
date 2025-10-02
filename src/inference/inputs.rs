@@ -203,94 +203,6 @@ fn realize_shape(orig: &[i64], token_length: i64) -> Result<Vec<i64>> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_realize_shape_1d_dynamic() {
-        let shape = vec![-1];
-        let result = realize_shape(&shape, 10).unwrap();
-        assert_eq!(result, vec![10]);
-    }
-
-    #[test]
-    fn test_realize_shape_1d_fixed() {
-        let shape = vec![5];
-        let result = realize_shape(&shape, 10).unwrap();
-        assert_eq!(result, vec![5]);
-    }
-
-    #[test]
-    fn test_realize_shape_2d_both_dynamic() {
-        let shape = vec![-1, -1];
-        let result = realize_shape(&shape, 15).unwrap();
-        assert_eq!(result, vec![1, 15]);
-    }
-
-    #[test]
-    fn test_realize_shape_2d_first_dynamic() {
-        let shape = vec![-1, 8];
-        let result = realize_shape(&shape, 12).unwrap();
-        assert_eq!(result, vec![1, 8]);
-    }
-
-    #[test]
-    fn test_realize_shape_2d_second_dynamic() {
-        let shape = vec![3, -1];
-        let result = realize_shape(&shape, 20).unwrap();
-        assert_eq!(result, vec![3, 20]);
-    }
-
-    #[test]
-    fn test_realize_shape_2d_both_fixed() {
-        let shape = vec![4, 6];
-        let result = realize_shape(&shape, 25).unwrap();
-        assert_eq!(result, vec![4, 6]);
-    }
-
-    #[test]
-    fn test_realize_shape_3d_all_dynamic() {
-        let shape = vec![-1, -1, -1];
-        let result = realize_shape(&shape, 30).unwrap();
-        assert_eq!(result, vec![1, 1, 30]);
-    }
-
-    #[test]
-    fn test_realize_shape_3d_mixed() {
-        let shape = vec![2, -1, 7];
-        let result = realize_shape(&shape, 18).unwrap();
-        assert_eq!(result, vec![2, 1, 7]);
-    }
-
-    #[test]
-    fn test_realize_shape_4d_general_case() {
-        let shape = vec![-1, 4, -1, 8];
-        let result = realize_shape(&shape, 50).unwrap();
-        assert_eq!(result, vec![1, 4, 1, 8]);
-    }
-
-    #[test]
-    fn test_realize_shape_empty() {
-        let shape = vec![];
-        assert!(realize_shape(&shape, 10).is_err());
-    }
-
-    #[test]
-    fn test_realize_shape_zero_token_length() {
-        let shape = vec![-1, -1];
-        let result = realize_shape(&shape, 0).unwrap();
-        assert_eq!(result, vec![1, 0]);
-    }
-
-    #[test]
-    fn test_realize_shape_large_dimensions() {
-        let shape = vec![-1, -1, -1, -1, -1];
-        assert!(realize_shape(&shape, 100).is_err());
-        // assert_eq!(result, vec![1, 100, 100, 100, 100]);
-    }
-}
-
 // Dynamic input builder that adapts to model signatures to generate ModelOutput's
 pub struct OutputBuilder {
     outputs: Vec<Signature>,
@@ -417,5 +329,94 @@ impl<T: Into<f32> + Copy> ModelOutput<T> {
             .enumerate()
             .map(|(i, prob)| (i, (*prob).into()))
             .collect())
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_realize_shape_1d_dynamic() {
+        let shape = vec![-1];
+        let result = realize_shape(&shape, 10).unwrap();
+        assert_eq!(result, vec![10]);
+    }
+
+    #[test]
+    fn test_realize_shape_1d_fixed() {
+        let shape = vec![5];
+        let result = realize_shape(&shape, 10).unwrap();
+        assert_eq!(result, vec![5]);
+    }
+
+    #[test]
+    fn test_realize_shape_2d_both_dynamic() {
+        let shape = vec![-1, -1];
+        let result = realize_shape(&shape, 15).unwrap();
+        assert_eq!(result, vec![1, 15]);
+    }
+
+    #[test]
+    fn test_realize_shape_2d_first_dynamic() {
+        let shape = vec![-1, 8];
+        let result = realize_shape(&shape, 12).unwrap();
+        assert_eq!(result, vec![1, 8]);
+    }
+
+    #[test]
+    fn test_realize_shape_2d_second_dynamic() {
+        let shape = vec![3, -1];
+        let result = realize_shape(&shape, 20).unwrap();
+        assert_eq!(result, vec![3, 20]);
+    }
+
+    #[test]
+    fn test_realize_shape_2d_both_fixed() {
+        let shape = vec![4, 6];
+        let result = realize_shape(&shape, 25).unwrap();
+        assert_eq!(result, vec![4, 6]);
+    }
+
+    #[test]
+    fn test_realize_shape_3d_all_dynamic() {
+        let shape = vec![-1, -1, -1];
+        let result = realize_shape(&shape, 30).unwrap();
+        assert_eq!(result, vec![1, 1, 30]);
+    }
+
+    #[test]
+    fn test_realize_shape_3d_mixed() {
+        let shape = vec![2, -1, 7];
+        let result = realize_shape(&shape, 18).unwrap();
+        assert_eq!(result, vec![2, 1, 7]);
+    }
+
+    #[test]
+    fn test_realize_shape_4d_general_case() {
+        let shape = vec![-1, 4, -1, 8];
+        let result = realize_shape(&shape, 50).unwrap();
+        assert_eq!(result, vec![1, 4, 1, 8]);
+    }
+
+    #[test]
+    fn test_realize_shape_empty() {
+        let shape = vec![];
+        assert!(realize_shape(&shape, 10).is_err());
+    }
+
+    #[test]
+    fn test_realize_shape_zero_token_length() {
+        let shape = vec![-1, -1];
+        let result = realize_shape(&shape, 0).unwrap();
+        assert_eq!(result, vec![1, 0]);
+    }
+
+    #[test]
+    fn test_realize_shape_large_dimensions() {
+        let shape = vec![-1, -1, -1, -1, -1];
+        assert!(realize_shape(&shape, 100).is_err());
+        // assert_eq!(result, vec![1, 100, 100, 100, 100]);
     }
 }

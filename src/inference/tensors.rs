@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn test_create_float64_tensor() -> Result<()> {
-        let data = vec![1.0f64, -2.5, 3.14, 0.0];
+        let data = vec![1.0f64, -2.5, 3.13, 0.0];
         let tensor = create_tensor(TensorElementType::Float64, &[4], data)?;
         assert!(tensor.is_tensor());
         Ok(())
