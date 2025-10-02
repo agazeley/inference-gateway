@@ -28,8 +28,6 @@ pub struct GenerationConfig {
     pub top_p: Option<f32>,
     pub min_p: Option<f32>,
     pub transformers_version: Option<String>,
-    #[serde(rename = "_from_model_config")]
-    pub from_model_config: Option<bool>,
 }
 
 impl GenerationConfig {
