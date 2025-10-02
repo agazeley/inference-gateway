@@ -22,3 +22,5 @@ target
 
 # Work in progress folder
 .wip
+
+__pycache__
