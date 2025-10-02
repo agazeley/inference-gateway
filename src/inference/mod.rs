@@ -24,7 +24,7 @@ const DEFAULT_HF_MODEL_FILENAME: &str = "INFERENCE_DEFAULT_HF_MODEL_FILENAME";
 // https://huggingface.co/openai-community/gpt2/resolve/main/tokenizer.json
 pub fn load_default_model() -> Result<AutoRegressiveModel> {
     let model_id = get_env(DEFAULT_HF_MODEL_ID, "openai-community/gpt2");
-    let model_filename = match get_env(DEFAULT_HF_MODEL_FILENAME, "") {
+    let model_filename = match get_env(DEFAULT_HF_MODEL_FILENAME, "onnx/decoder_model.onnx") {
         s if s.is_empty() => None,
         s => Some(s),
     };
