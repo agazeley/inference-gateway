@@ -66,7 +66,7 @@ pub struct InputBuilder {
 
 impl InputBuilder {
     pub fn from_session_inputs(inputs: &[Input]) -> Self {
-        let signatures = inputs
+        let signatures: Vec<Signature> = inputs
             .iter()
             .map(|input| {
                 Signature {
@@ -76,7 +76,10 @@ impl InputBuilder {
                 }
             })
             .collect();
-
+        debug!("Inputs");
+        signatures.iter().for_each(|s| {
+            debug!("{:?}", s);
+        });
         Self { signatures }
     }
 
