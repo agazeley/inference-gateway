@@ -55,8 +55,7 @@ Configure the service using environment variables:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `INFERENCE_DEFAULT_MODEL_NAME` | Model identifier | `gpt2` |
-| `INFERENCE_DEFAULT_MODEL_PATH` | Model URL or local path | GPT-2 ONNX model URL |
-| `INFERENCE_DEFAULT_TOKENIZER` | Tokenizer identifier | `openai-community/gpt2` |
+| `INFERENCE_DEFAULT_HF_MODEL_ID` | Huggingface Model ID to pull from cache or online. Default credentials used for download. | GPT-2 ONNX model URL |
 | `RUST_LOG` | Logging configuration | `info,ort=warn,tower_http=info` |
 
 ## API Reference

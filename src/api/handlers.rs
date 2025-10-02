@@ -35,10 +35,10 @@ impl From<PostInferenceRequest> for TextGenerationParameters {
     fn from(req: PostInferenceRequest) -> Self {
         let mut params = Self::new();
         if req.max_tokens.is_some() {
-            params.max_tokens = req.max_tokens.unwrap()
+            params.max_tokens = req.max_tokens
         }
         if req.temperature.is_some() {
-            params.temperature = req.temperature.unwrap()
+            params.temperature = req.temperature
         }
         if req.top_p.is_some() {
             params.top_p = req.top_p
@@ -54,6 +54,7 @@ pub struct PostInferenceResponse {
     model: String,
     metadata: HashMap<String, String>,
 }
+
 /// Handles POST requests to the `/inference` endpoint.
 ///
 /// This asynchronous function takes a JSON payload containing a `text` field,

@@ -28,7 +28,10 @@ pub struct Tokenizer {
 
 // TODO: unique error messages for exposed methods?
 impl Tokenizer {
-    pub fn new(cfg: TokenizerConfig, chat_template: Option<Box<dyn ChatTemplate>>) -> Result<Tokenizer> {
+    pub fn new(
+        cfg: TokenizerConfig,
+        chat_template: Option<Box<dyn ChatTemplate>>,
+    ) -> Result<Tokenizer> {
         if cfg.pretrained_identifier.is_none() && cfg.filepath.is_none() {
             return Err(InferenceError::Configuration(
                 "missing tokenizer file or identifier".to_string(),
@@ -61,7 +64,7 @@ impl Tokenizer {
     }
 
     // Re-expose selected methods
-    
+
     pub fn tokenize_to_ids(&self, text: &str) -> Result<Vec<u32>> {
         let enc: Encoding = self
             .inner

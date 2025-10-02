@@ -1,21 +1,107 @@
+use std::path::PathBuf;
+
 use crate::inference::{
     errors::{InferenceError, Result},
     inputs::{InputBuilder, ModelOutput, OutputBuilder},
 };
+use hf_hub::api::sync::Api;
 use log::debug;
 use ort::{
     execution_providers::{CUDAExecutionProvider, ExecutionProvider},
     session::{Session, builder::GraphOptimizationLevel},
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 const DEFAULT_MODEL_NAME: &str = "unknown";
 const DEFAULT_MODEL_PATH: &str = "data/model.onnx";
 
+// Subset of supported HF transforms Generation Config
+// https://huggingface.co/docs/transformers/v4.56.2/en/main_classes/text_generation#transformers.GenerationConfig
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct GenerationConfig {
+    pub do_sample: Option<bool>,
+    pub bos_token_id: Option<serde_json::Value>,
+    pub eos_token_id: Option<serde_json::Value>, // i64 || vec<i64>
+    pub pad_token_id: Option<serde_json::Value>,
+    pub temperature: Option<f32>,
+    pub top_k: Option<i64>,
+    pub top_p: Option<f32>,
+    pub min_p: Option<f32>,
+    pub transformers_version: Option<String>,
+    #[serde(rename = "_from_model_config")]
+    pub from_model_config: Option<bool>,
+}
+
+impl GenerationConfig {
+    pub fn from_string(data: String) -> Result<Self> {
+        let c: Self = serde_json::from_str(&data).map_err(|e| {
+            debug!("{}", data);
+            InferenceError::ModelLoading(format!(
+                "Failed to serialize generation config data: {}",
+                e
+            ))
+        })?;
+        Ok(c)
+    }
+
+    pub fn from_file(path: PathBuf) -> Result<Self> {
+        let data = std::fs::read_to_string(&path).map_err(|e| {
+            InferenceError::ModelLoading(format!("Failed to read generation config file: {}", e))
+        })?;
+        Self::from_string(data)
+    }
+
+    pub fn from_url(_url: String) -> Result<Self> {
+        Ok(Self::default()) // TODO: impl
+    }
+
+    pub fn from_hf(model_id: String) -> Result<Self> {
+        let api = Api::new().unwrap();
+        let repo = api.model(model_id);
+        let path = repo.get("generation_config.json").map_err(|e| {
+            InferenceError::ModelLoading(format!("unable to fetch model generation config: {}", e))
+        })?;
+        Self::from_file(path)
+    }
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct RemoteModelLoadConfig {
+    pub url: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct HfModelLoadConfig {
+    pub id: String,
+    pub filename: Option<String>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct LocalModelLoadConfig {
+    pub path: PathBuf,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub enum ModelLoadConfig {
+    Remote(RemoteModelLoadConfig),
+    Hf(HfModelLoadConfig),
+    Local(LocalModelLoadConfig),
+}
+
+impl ModelLoadConfig {
+    fn get_generation_config(self) -> Result<GenerationConfig> {
+        match self {
+            ModelLoadConfig::Remote(cfg) => GenerationConfig::from_hf(cfg.url),
+            ModelLoadConfig::Hf(cfg) => GenerationConfig::from_hf(cfg.id),
+            ModelLoadConfig::Local(cfg) => GenerationConfig::from_file(cfg.path),
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct AutoRegressiveModelConfig {
     pub model_name: String,
-    pub model_path: String,
+    pub model_cfg: ModelLoadConfig,
     pub intra_threads: usize,
     #[serde(skip_serializing)]
     pub optimization_level: GraphOptimizationLevel,
@@ -25,7 +111,7 @@ impl Clone for AutoRegressiveModelConfig {
     fn clone(&self) -> Self {
         Self {
             model_name: self.model_name.clone(),
-            model_path: self.model_path.clone(),
+            model_cfg: self.model_cfg.clone(),
             intra_threads: self.intra_threads,
             optimization_level: match self.optimization_level {
                 GraphOptimizationLevel::Disable => GraphOptimizationLevel::Disable,
@@ -74,14 +160,30 @@ impl AutoRegressiveModelConfig {
         }
 
         // Load model from URL or local file
-        let session = if self.model_path.starts_with("http") {
-            builder.commit_from_url(self.model_path).map_err(|e| {
-                InferenceError::ModelLoading(format!("Failed to commit from URL: {}", e))
-            })?
-        } else {
-            builder.commit_from_file(self.model_path).map_err(|e| {
-                InferenceError::ModelLoading(format!("Failed to commit from file: {}", e))
-            })?
+        let session = match self.model_cfg {
+            ModelLoadConfig::Remote(cfg) => builder.commit_from_url(&cfg.url).map_err(|e| {
+                InferenceError::ModelLoading(format!("Failed to commit from remote URL: {}", e))
+            })?,
+            ModelLoadConfig::Hf(cfg) => {
+                let api = Api::new().unwrap();
+                let repo = api.model(cfg.id);
+                let filename = cfg.filename.unwrap_or("model.onnx".to_string());
+                let path = repo.get(filename.as_str()).map_err(|e| {
+                    InferenceError::ModelLoading(format!(
+                        "Failed to fetch model from HuggingFace: {}",
+                        e
+                    ))
+                })?;
+                builder.commit_from_file(path).map_err(|e| {
+                    InferenceError::ModelLoading(format!(
+                        "Failed to commit from HuggingFace file: {}",
+                        e
+                    ))
+                })?
+            }
+            ModelLoadConfig::Local(cfg) => builder.commit_from_file(cfg.path).map_err(|e| {
+                InferenceError::ModelLoading(format!("Failed to commit from local file: {}", e))
+            })?,
         };
         Ok(session)
     }
@@ -91,7 +193,9 @@ impl Default for AutoRegressiveModelConfig {
     fn default() -> Self {
         Self {
             model_name: DEFAULT_MODEL_NAME.to_string(),
-            model_path: DEFAULT_MODEL_PATH.to_string(),
+            model_cfg: ModelLoadConfig::Local(LocalModelLoadConfig {
+                path: PathBuf::from(DEFAULT_MODEL_PATH),
+            }),
             intra_threads: 4,
             optimization_level: GraphOptimizationLevel::Level3,
         }
@@ -100,6 +204,7 @@ impl Default for AutoRegressiveModelConfig {
 
 pub struct AutoRegressiveModel {
     pub name: String,
+    pub generate_cfg: GenerationConfig,
     session: Session,
     input_builder: InputBuilder,
     output_builder: OutputBuilder,
@@ -147,8 +252,13 @@ impl AutoRegressiveModel {
         let output_builder = OutputBuilder::from_session_outputs(&session.outputs);
         debug!("{}{}", banner, banner);
 
+        let model_cfg = cfg.model_cfg.clone();
+        let session = cfg.build_session()?;
+        let generate_cfg = model_cfg.get_generation_config()?;
+
         Ok(Self {
-            session: cfg.build_session()?,
+            session,
+            generate_cfg,
             input_builder,
             output_builder,
             name,

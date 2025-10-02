@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use hf_hub::api::sync::Api;
-use minijinja::{context, Environment};
+use minijinja::{Environment, context};
 
 use crate::inference::{
     errors::{InferenceError, Result},
@@ -14,7 +14,8 @@ Some good docs:
 */
 
 pub trait ChatTemplate: Sync + Send {
-    fn format_request(&self, 
+    fn format_request(
+        &self,
         chat_request: &ChatRequest,
         add_generation_prompt: bool,
         bos_tok: Option<String>,
@@ -40,12 +41,13 @@ pub struct SimpleChatTemplate {
 /// A `String` containing the formatted prompt, constructed by concatenating
 /// the template's prefix, the user input, and the template's suffix.
 impl ChatTemplate for SimpleChatTemplate {
-    fn format_request(&self, 
-        chat_request: &ChatRequest, 
+    fn format_request(
+        &self,
+        chat_request: &ChatRequest,
         _add_generation_prompt: bool,
         _bos_tok: Option<String>,
         _eos_tok: Option<String>,
-        _unk_tok: Option<String>
+        _unk_tok: Option<String>,
     ) -> Result<String> {
         let mut input = String::new();
         chat_request.messages.iter().for_each(|msg| {
@@ -95,15 +97,17 @@ impl<'a> JinjaChatTemplate<'a> {
     pub fn from_hf(model_id: String) -> Result<Self> {
         let mut t = Self::new(model_id.clone());
         let path = download_from_hf(model_id.clone())?;
-        let source = std::fs::read_to_string(&path)
-            .map_err(|e| InferenceError::ChatTemplateError(format!("Failed to read template file: {}", e)))?;
+        let source = std::fs::read_to_string(&path).map_err(|e| {
+            InferenceError::ChatTemplateError(format!("Failed to read template file: {}", e))
+        })?;
         t.env.add_template_owned(model_id, source).unwrap();
         Ok(t)
     }
 }
 
 impl<'a> ChatTemplate for JinjaChatTemplate<'a> {
-    fn format_request(&self,
+    fn format_request(
+        &self,
         chat_request: &ChatRequest,
         add_generation_prompt: bool,
         bos_tok: Option<String>,
@@ -119,13 +123,12 @@ impl<'a> ChatTemplate for JinjaChatTemplate<'a> {
             bos_tok,
             eos_tok,
             unk_tok,
-        )).map_err(|e| {
-            InferenceError::ChatTemplateError(format!("error rendering template: {}", e))
-        })
+        ))
+        .map_err(|e| InferenceError::ChatTemplateError(format!("error rendering template: {}", e)))
     }
 }
 
-pub fn download_from_hf(model_id: String) -> Result<PathBuf>{
+pub fn download_from_hf(model_id: String) -> Result<PathBuf> {
     let api = Api::new().unwrap();
     let repo = api.model(model_id);
     repo.get("chat_template.jinja").map_err(|e| {
