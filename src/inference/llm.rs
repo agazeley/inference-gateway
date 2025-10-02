@@ -87,9 +87,6 @@ impl LLM {
     pub fn generate(&mut self, input: String, params: TextGenerationParameters) -> Result<String> {
         debug!("Generating from: {:?}", params);
         debug!("Input: {:?}", input);
-        let mut input_tokens = self.tokenize_input(&input)?;
-        let mut generated_tokens = Vec::new();
-        let mut rng = rand::rng();
         let max_tokens = params.max_tokens.unwrap_or(DEFAULT_MAX_TOKENS);
         let min_p = self.model.generate_cfg.min_p.unwrap_or(DEFAULT_MIN_P);
         let temperature = params.temperature.unwrap_or(
@@ -105,6 +102,21 @@ impl LLM {
             .top_p
             .unwrap_or(self.model.generate_cfg.top_p.unwrap_or(DEFAULT_TOP_P));
 
+        self.generate_inner(input, max_tokens, min_p, temperature, top_k, top_p)
+    }
+
+    fn generate_inner(
+        &mut self,
+        input: String,
+        max_tokens: i32,
+        min_p: f32,
+        temperature: f32,
+        top_k: i64,
+        top_p: f32,
+    ) -> Result<String> {
+        let mut input_tokens = self.tokenize_input(&input)?;
+        let mut generated_tokens = Vec::new();
+        let mut rng = rand::rng();
         for _ in 0..max_tokens {
             let output = self.model.run(&input_tokens)?; // TODO: this probaby will not work
             let logits = output.logits()?;
@@ -133,8 +145,11 @@ impl LLM {
             input_tokens.push(token);
             generated_tokens.push(token as u32);
         }
+        self.decode_output(&generated_tokens)
+    }
 
-        match self.tokenizer.decode(&generated_tokens, true) {
+    fn decode_output(&self, generated_tokens: &[u32]) -> Result<String> {
+        match self.tokenizer.decode(generated_tokens, true) {
             Ok(output) => Ok(output.trim_start().to_string()),
             Err(e) => Err(InferenceError::TextGenerationError(format!(
                 "Failed to decode output: {}",
