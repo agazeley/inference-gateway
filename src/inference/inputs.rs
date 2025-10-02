@@ -332,7 +332,6 @@ impl<T: Into<f32> + Copy> ModelOutput<T> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
