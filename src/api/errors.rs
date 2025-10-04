@@ -1,14 +1,17 @@
 use thiserror::Error as ThisError;
 
 use crate::inference::errors::InferenceError;
+use crate::repository::errors::RepositoryError;
 
 // Result type alias
 pub type Result<T> = std::result::Result<T, ApiError>;
 
-// Main error type for the inference lib.
+// Simple API error type
 #[derive(ThisError, Debug)]
 pub enum ApiError {
-    // Inference errors
-    #[error("Inference initialization error: {0}")]
-    InferenceInit(InferenceError),
+    #[error("Inference error: {0}")]
+    Inference(#[from] InferenceError),
+
+    #[error("Repository error: {0}")]
+    Repository(#[from] RepositoryError),
 }

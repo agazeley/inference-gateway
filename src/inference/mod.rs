@@ -7,6 +7,7 @@ use crate::inference::model::{
 };
 use crate::inference::prompting::{ChatTemplate, JinjaChatTemplate};
 use crate::inference::tokenization::{Tokenizer, TokenizerConfig};
+use crate::utils::get_env;
 
 pub mod errors;
 pub mod llm;
@@ -59,8 +60,4 @@ pub fn load_default_tokenizer() -> Result<Tokenizer> {
     };
     info!("Loading tokenizer: {:?}", cfg);
     Tokenizer::new(cfg, chat_template)
-}
-
-fn get_env(key: &str, default: &str) -> String {
-    std::env::var(key).unwrap_or_else(|_| default.to_string())
 }
