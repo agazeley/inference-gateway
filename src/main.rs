@@ -15,7 +15,7 @@ async fn main() {
     let addr = "0.0.0.0:3000";
     let mut srv = Server::default();
 
-    let api_router = match router::get_router() {
+    let api_router = match router::get_router().await {
         Ok(r) => r,
         Err(e) => {
             panic!("error creating router: {:?}", e.to_string());

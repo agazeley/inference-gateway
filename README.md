@@ -202,6 +202,21 @@ RUST_LOG=info,inference_gateway=debug,tower_http=info cargo run
 
 ### Local Development Setup
 ```bash
+# Formating
+cargo fmt
+
+# Linting
+cargo check
+cargo clippy --fix --allow-dirty
+
+# Testing
+cargo test
+
+# Integration tests
+pytest -n 4 tests/integration
+```
+
+```bash
 # Install development dependencies
 cargo install cargo-watch cargo-nextest
 

@@ -5,7 +5,10 @@ use log::error;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::{repository::models::Transaction, services::TransactionService};
+use crate::{
+    repository::models::Transaction, repository::sqlite::SQLiteTransactionRepository,
+    services::TransactionService,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 struct ListTransactionResponse {
@@ -20,10 +23,10 @@ pub struct PostTransactionsRequest {
 
 // TODO: Not sure if we need this - but maybe?
 pub async fn post_transactions(
-    Extension(svc): Extension<Arc<TransactionService>>,
+    Extension(svc): Extension<Arc<TransactionService<SQLiteTransactionRepository>>>,
     Json(req): Json<PostTransactionsRequest>,
 ) -> (StatusCode, Json<Value>) {
-    let t = match svc.create_transaction(req.transaction) {
+    let t = match svc.create_transaction(req.transaction).await {
         Ok(t) => t,
         Err(e) => {
             error!("Transaction creation error: {}", e);
@@ -43,9 +46,9 @@ pub async fn post_transactions(
 }
 
 pub async fn get_transactions(
-    Extension(svc): Extension<Arc<TransactionService>>,
+    Extension(svc): Extension<Arc<TransactionService<SQLiteTransactionRepository>>>,
 ) -> (StatusCode, Json<Value>) {
-    let transactions = match svc.get_transactions() {
+    let transactions = match svc.get_transactions().await {
         Ok(t) => t,
         Err(e) => {
             error!("Transaction list error: {}", e);

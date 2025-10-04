@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 use crate::{
     inference::llm::{ChatRequest, LLM, Message, TextGenerationParameters},
     repository::models::Transaction,
+    repository::sqlite::SQLiteTransactionRepository,
     services::TransactionService,
 };
 
@@ -101,7 +102,7 @@ pub struct PostInferenceResponse {
 /// ```
 pub async fn post_inference(
     Extension(llm): Extension<Arc<Mutex<LLM>>>,
-    Extension(svc): Extension<Arc<TransactionService>>,
+    Extension(svc): Extension<Arc<TransactionService<SQLiteTransactionRepository>>>,
     Json(req): Json<PostInferenceRequest>,
 ) -> (StatusCode, Json<Value>) {
     // Limit the scope of the lock so we don't hold it while serializing / responding
@@ -127,7 +128,7 @@ pub async fn post_inference(
     debug!("Inference result: {}", generated);
     t.set_response(generated.clone());
     t.set_model(model_name.clone());
-    if let Err(e) = svc.create_transaction(t) {
+    if let Err(e) = svc.create_transaction(t).await {
         error!("Failed to create transaction: {}", e);
     }
 

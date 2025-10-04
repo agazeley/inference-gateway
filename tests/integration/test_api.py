@@ -21,9 +21,10 @@ def test_health_check(base_url):
 @pytest.mark.parametrize("payload", [
     {
         "text": "The future of artificial intelligence",
-        "max_tokens": 100,
+        "max_tokens": 10,
         "temperature": 0.7,
-        "top_p": 0.9
+        "top_p": 0.9,
+        "top_k": 1
     },
     {
         "text": "Exploring the universe",

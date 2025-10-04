@@ -2,23 +2,24 @@ use log::info;
 
 use crate::repository::TransactionRepository;
 use crate::repository::errors::RepositoryError;
-use crate::repository::models::Transaction; // Add this import if Transaction is defined in models.rs
+use crate::repository::models::Transaction;
 
-pub struct TransactionService {
-    repo: Box<dyn TransactionRepository>,
+pub struct TransactionService<T: TransactionRepository> {
+    repo: T,
 }
 
-impl TransactionService {
-    pub fn new(mut repo: Box<dyn TransactionRepository>) -> Result<Self, RepositoryError> {
-        repo.initialize()?;
+impl<T: TransactionRepository> TransactionService<T> {
+    pub async fn new(mut repo: T) -> Result<Self, RepositoryError> {
+        repo.initialize().await?;
         info!("Transaction service initialized");
         Ok(Self { repo })
     }
-    pub fn get_transactions(&self) -> Result<Vec<Transaction>, RepositoryError> {
-        self.repo.get_transactions()
+
+    pub async fn get_transactions(&self) -> Result<Vec<Transaction>, RepositoryError> {
+        self.repo.get_transactions().await
     }
 
-    pub fn create_transaction(&self, t: Transaction) -> Result<Transaction, RepositoryError> {
-        self.repo.create_transaction(t)
+    pub async fn create_transaction(&self, t: Transaction) -> Result<Transaction, RepositoryError> {
+        self.repo.create_transaction(t).await
     }
 }
