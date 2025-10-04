@@ -1,4 +1,4 @@
-use inference_gateway::{api, server::Server};
+use inference_gateway::{router, server::Server};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 #[tokio::main]
@@ -15,7 +15,7 @@ async fn main() {
     let addr = "0.0.0.0:3000";
     let mut srv = Server::default();
 
-    let api_router = match api::get_router() {
+    let api_router = match router::get_router() {
         Ok(r) => r,
         Err(e) => {
             panic!("error creating router: {:?}", e.to_string());

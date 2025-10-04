@@ -2,13 +2,14 @@ mod errors;
 mod inference;
 mod transactions;
 
-use crate::api::errors::ApiError;
-use crate::api::inference::post_inference;
-use crate::api::transactions::{get_transactions, post_transactions};
 use crate::inference::llm::LLM;
 use crate::inference::{load_default_model, load_default_tokenizer};
-use crate::repository::SqlliteTransactionRepository;
+use crate::repository::sqlite::SQLiteTransactionRepository;
+use crate::router::errors::ApiError;
+use crate::router::inference::post_inference;
+use crate::router::transactions::{get_transactions, post_transactions};
 use crate::services::TransactionService;
+
 use axum::routing::get;
 use axum::{Extension, Router, routing::post};
 use std::sync::{Arc, Mutex};
@@ -26,7 +27,7 @@ pub fn get_router() -> errors::Result<Router> {
     let language_model = LLM::new(model, tokenizer);
     let shared_model = Arc::new(Mutex::new(language_model));
 
-    let repository = SqlliteTransactionRepository::new().map_err(ApiError::Repository)?;
+    let repository = SQLiteTransactionRepository::new().map_err(ApiError::Repository)?;
     let svc = TransactionService::new(Box::new(repository))?;
     let shared_svc = Arc::new(svc);
 

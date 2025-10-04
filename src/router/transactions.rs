@@ -15,13 +15,14 @@ struct ListTransactionResponse {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct PostTransactionsRequest {
-    transaction: Transaction
+    transaction: Transaction,
 }
 
+// TODO: Not sure if we need this - but maybe?
 pub async fn post_transactions(
     Extension(svc): Extension<Arc<TransactionService>>,
     Json(req): Json<PostTransactionsRequest>,
-) -> (StatusCode, Json<Value>){
+) -> (StatusCode, Json<Value>) {
     let t = match svc.create_transaction(req.transaction) {
         Ok(t) => t,
         Err(e) => {
@@ -35,7 +36,10 @@ pub async fn post_transactions(
         }
     };
     // I do not like this but the analyzer dislikes it more.
-    (StatusCode::ACCEPTED, Json(json!(PostTransactionsRequest{transaction: t})))
+    (
+        StatusCode::ACCEPTED,
+        Json(json!(PostTransactionsRequest { transaction: t })),
+    )
 }
 
 pub async fn get_transactions(

@@ -35,5 +35,26 @@ def test_health_check(base_url):
 def test_generate_text(base_url, payload):
     response = requests.post(f"{base_url}/api/v1/inference", json=payload)
     assert response.status_code == 200
-    response_json = response.json()
-    assert all(key in response_json for key in ["text", "model", "metadata"])
+    data = response.json()
+    assert all(key in data for key in ["text", "model", "metadata"]), data
+
+
+def test_post_transactions(base_url):
+    url = f"{base_url}/api/v1/transactions"
+    payload = {
+        "transaction": {
+            "prompt": "Test prompt",
+            "response": "Test response"
+        }
+    }
+    response = requests.post(url, json=payload)
+    assert response.status_code == 202, response.text
+    assert response.json().get("id") != 0
+
+def test_get_transactions(base_url):
+    url = f"{base_url}/api/v1/transactions"
+    response = requests.get(url)
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert isinstance(data["transactions"], list), data
+    assert isinstance(data["count"], int), data

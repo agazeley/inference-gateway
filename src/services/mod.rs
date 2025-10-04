@@ -18,7 +18,7 @@ impl TransactionService {
         self.repo.get_transactions()
     }
 
-    pub fn create_transaction(&self, t: Transaction) -> Result<Transaction, RepositoryError>{
+    pub fn create_transaction(&self, t: Transaction) -> Result<Transaction, RepositoryError> {
         self.repo.create_transaction(t)
     }
 }

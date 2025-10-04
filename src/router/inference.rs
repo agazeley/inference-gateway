@@ -8,7 +8,11 @@ use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::inference::llm::{ChatRequest, LLM, Message, TextGenerationParameters};
+use crate::{
+    inference::llm::{ChatRequest, LLM, Message, TextGenerationParameters},
+    repository::models::Transaction,
+    services::TransactionService,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct PostInferenceRequest {
@@ -97,9 +101,11 @@ pub struct PostInferenceResponse {
 /// ```
 pub async fn post_inference(
     Extension(llm): Extension<Arc<Mutex<LLM>>>,
+    Extension(svc): Extension<Arc<TransactionService>>,
     Json(req): Json<PostInferenceRequest>,
 ) -> (StatusCode, Json<Value>) {
     // Limit the scope of the lock so we don't hold it while serializing / responding
+    let mut t = Transaction::new(req.text.clone());
     let (generated, model_name) = {
         let mut llm_guard = llm.lock().unwrap();
         let model_name = llm_guard.model_name();
@@ -119,6 +125,12 @@ pub async fn post_inference(
         }
     };
     debug!("Inference result: {}", generated);
+    t.set_response(generated.clone());
+    t.set_model(model_name.clone());
+    if let Err(e) = svc.create_transaction(t) {
+        error!("Failed to create transaction: {}", e);
+    }
+
     (
         StatusCode::OK,
         Json(json!(PostInferenceResponse {

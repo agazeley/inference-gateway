@@ -1,62 +1,114 @@
 # Inference Gateway
 
-A high-performance AI inference service built in Rust for production text generation workloads using ONNX models.
+A high-performance AI inference service built in Rust for production text generation workloads using ONNX models with persistent transaction storage.
 
 ## Overview
 
-Inference Gateway provides a scalable HTTP API for text generation with enterprise-grade features including observability, health monitoring, and configurable inference parameters. Built with Rust and ONNX Runtime for optimal performance and resource efficiency.
+Inference Gateway provides a scalable HTTP API for text generation with enterprise-grade features including observability, health monitoring, configurable inference parameters, and persistent data storage. Built with Rust and ONNX Runtime for optimal performance and resource efficiency.
 
 ## Architecture
 
 - **API Layer**: Axum-based HTTP service with JSON request/response handling
-- **Inference Engine**: ONNX Runtime integration with autoregressive model support
+- **Inference Engine**: ONNX Runtime integration with autoregressive model support and KV-caching
+- **Data Layer**: SQLite-based persistent storage with configurable migrations
 - **Observability**: Prometheus metrics, structured logging, and distributed tracing
 - **Concurrency**: Thread-safe model sharing with async request handling
+- **Deployment**: Docker and Docker Compose support with multi-stage builds
 
 ## Features
 
 ### Core Functionality
-- Text generation with configurable parameters (temperature, top-p, max tokens)
-- Support for multiple model formats via ONNX Runtime
-- Batched inference capabilities
-- Custom prompt templating system, including Jinja-based templates
+- **Text Generation**: Configurable parameters (temperature, top-p, max tokens, min-p)
+- **Model Support**: Multiple model formats via ONNX Runtime with dynamic shape handling
+- **Prompt Templates**: Custom templating system with Jinja-based templates
+- **Transaction Storage**: Persistent storage of inference requests and responses
+
+### Database Features
+- **SQLite Integration**: Embedded database for transaction persistence
+- **Migration System**: Configurable database migrations (safe updates or full recreation)
+- **Environment Configuration**: Database path and migration mode via environment variables
 
 ### Production Features
-- Prometheus metrics collection
-- Structured logging with configurable levels
-- Health and readiness endpoints
-- Request ID propagation
-- Graceful shutdown handling
+- **Docker Support**: Multi-stage Dockerfile with CUDA support
+- **Container Orchestration**: Docker Compose configurations for development and production
+- **Health Monitoring**: Health and readiness endpoints with container health checks
+- **Observability**: Prometheus metrics, structured logging, and distributed tracing
+- **Request Tracking**: Request ID propagation and correlation
 
 ## Installation
 
 ### Prerequisites
-- Rust 1.70+ (2024 edition)
-- ONNX Runtime dependencies
+- **Rust**: 1.70+ (2024 edition)
+- **ONNX Runtime**: Compatible with CUDA 12.9+ (optional for GPU acceleration)
+- **Docker**: For containerized deployment (optional)
 
-### Building from Source
+### Quick Start with Docker
+
 ```bash
+# Clone the repository
 git clone <repository-url>
 cd inference-gateway
-cargo build --release
+
+# Production deployment
+docker compose up --build -d
+
+# Development deployment (with database reset and web interface)
+docker compose -f docker-compose.dev.yml up --build
 ```
 
 ### Running
 ```bash
+# Build the project
+cargo build --release
+
+# Run with default configuration
 cargo run --release
+
+# Run with custom database configuration
+DATABASE_MIGRATION_MODE=create_if_not_exists cargo run --release
 ```
 
 The service starts on `0.0.0.0:3000` by default.
+
+### Environment Configuration
+
+Copy and customize the environment file:
+```bash
+cp .env.example .env
+# Edit .env with your preferred settings
+```
 
 ## Configuration
 
 Configure the service using environment variables:
 
+### Core Configuration
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `INFERENCE_DEFAULT_MODEL_NAME` | Model identifier | `gpt2` |
-| `INFERENCE_DEFAULT_HF_MODEL_ID` | Huggingface Model ID to pull from cache or online. Default credentials used for download. | GPT-2 ONNX model URL |
+| `INFERENCE_DEFAULT_HF_MODEL_ID` | Hugging Face model ID for download | GPT-2 ONNX model URL |
 | `RUST_LOG` | Logging configuration | `info,ort=warn,tower_http=info` |
+
+### Database Configuration
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_PATH` | SQLite database file path | `/runtime/database.db` |
+| `DATABASE_MIGRATION_MODE` | Migration strategy | `create_if_not_exists` |
+
+### Migration Modes
+- **`create_if_not_exists`**: Safe mode - preserves existing data, creates tables if missing
+- **`drop_recreate`**: Development mode - **DELETES ALL DATA** and recreates tables
+
+### Docker Configuration
+The Docker Compose setup supports additional environment variables for container orchestration:
+
+```yaml
+# Production mode (safe migrations)
+DATABASE_MIGRATION_MODE=create_if_not_exists
+
+# Development mode (reset database on startup)
+DATABASE_MIGRATION_MODE=drop_recreate
+```
 
 ## API Reference
 
@@ -91,12 +143,37 @@ Configure the service using environment variables:
 - `max_tokens` (optional): Maximum number of tokens to generate (default: 50)
 - `temperature` (optional): Controls randomness (0.0-2.0, default: 1.0)
 - `top_p` (optional): Nucleus sampling parameter (0.0-1.0, default: 1.0)
+- `min_p` (optional): Minimum probability threshold (0.0-1.0, default: 0.0)
+
+### Transaction Management
+
+**Endpoint:** `GET /transactions`
+- Retrieve all stored inference transactions
+
+**Endpoint:** `POST /transactions`
+- Store a new inference transaction
+
+**Request Body:**
+```json
+{
+  "transaction": {
+    "prompt": "User input text",
+    "response": "Generated response",
+    "model_name": "model-identifier"
+  }
+}
+```
 
 ### Health Endpoints
 
 - `GET /healthz` - Service health check (always returns 200 when service is running)
 - `GET /readyz` - Readiness check (returns 200 when model is loaded and ready)
 - `GET /metrics` - Prometheus metrics in OpenMetrics format
+
+### Database Web Interface (Development)
+When using the development Docker Compose setup, a SQLite web interface is available:
+- **URL**: http://localhost:8080
+- **Features**: Browse, query, and manage SQLite database content
 
 ## Monitoring
 
@@ -123,13 +200,30 @@ RUST_LOG=info,inference_gateway=debug,tower_http=info cargo run
 
 ## Development
 
-### Setup
+### Local Development Setup
 ```bash
 # Install development dependencies
 cargo install cargo-watch cargo-nextest
 
 # Run with auto-reload
 cargo watch -x "clippy --profile test" -x "test" -x run
+
+# Run with database reset (development mode)
+DATABASE_MIGRATION_MODE=drop_recreate cargo run
+```
+
+### Docker Development
+```bash
+# Development environment with database viewer
+docker compose -f docker-compose.dev.yml up --build
+
+# Access services:
+# - API: http://localhost:3000
+# - Database viewer: http://localhost:8080
+
+# Reset development environment
+docker compose -f docker-compose.dev.yml down -v
+docker compose -f docker-compose.dev.yml up --build
 ```
 
 ### Testing
@@ -142,6 +236,9 @@ cargo nextest run
 
 # Integration tests
 cargo test --test integration
+
+# Test with clean database
+DATABASE_MIGRATION_MODE=drop_recreate cargo test
 ```
 
 ### Code Quality
@@ -154,6 +251,18 @@ cargo clippy --profile test
 
 # Security audit
 cargo audit
+```
+
+### Database Operations
+```bash
+# Safe migration (preserves data)
+DATABASE_MIGRATION_MODE=create_if_not_exists cargo run
+
+# Reset database (deletes all data)
+DATABASE_MIGRATION_MODE=drop_recreate cargo run
+
+# Custom database path
+DATABASE_PATH=./custom.db cargo run
 ```
 
 ## Contributing
