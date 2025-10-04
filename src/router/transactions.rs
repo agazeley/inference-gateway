@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::{
-    repository::models::Transaction, repository::sqlite::SQLiteTransactionRepository,
-    services::TransactionService,
+    repository::models::Transaction, repository::sql::SQLTransactionRepository,
+    services::transactions::TransactionService,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -21,9 +21,8 @@ pub struct PostTransactionsRequest {
     transaction: Transaction,
 }
 
-// TODO: Not sure if we need this - but maybe?
 pub async fn post_transactions(
-    Extension(svc): Extension<Arc<TransactionService<SQLiteTransactionRepository>>>,
+    Extension(svc): Extension<Arc<TransactionService<SQLTransactionRepository>>>,
     Json(req): Json<PostTransactionsRequest>,
 ) -> (StatusCode, Json<Value>) {
     let t = match svc.create_transaction(req.transaction).await {
@@ -46,7 +45,7 @@ pub async fn post_transactions(
 }
 
 pub async fn get_transactions(
-    Extension(svc): Extension<Arc<TransactionService<SQLiteTransactionRepository>>>,
+    Extension(svc): Extension<Arc<TransactionService<SQLTransactionRepository>>>,
 ) -> (StatusCode, Json<Value>) {
     let transactions = match svc.get_transactions().await {
         Ok(t) => t,

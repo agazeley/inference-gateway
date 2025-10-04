@@ -1,6 +1,6 @@
 pub mod errors;
 pub mod models;
-pub mod sqlite;
+pub mod sql;
 
 use crate::repository::{errors::Result, models::Transaction};
 

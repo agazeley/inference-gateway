@@ -1,3 +1,5 @@
+use std::{fs, path::Path};
+
 use crate::{
     repository::{
         MigrationMode, TransactionRepository,
@@ -7,33 +9,53 @@ use crate::{
     utils::get_env,
 };
 use log::{info, warn};
-use sqlx::{Row, SqlitePool};
+use sqlx::{AnyPool, Row};
+use std::env;
 
 const DATABASE_MIGRATION_MODE_VAR: &str = "DATABASE_MIGRATION_MODE";
-const DATABASE_PATH_VAR: &str = "DATABASE_PATH";
+const DATABASE_CONNECTION_STRING_VAR: &str = "DATABASE_CONNECTION_STRING";
+const SQLITE_FILE_PREFIX: &str = "sqlite:file:";
 
-pub struct SQLiteTransactionRepository {
-    pool: SqlitePool,
-    initialized: bool,
+#[derive(Clone)]
+pub struct SQLTransactionRepository {
+    pool: AnyPool,
 }
 
-impl SQLiteTransactionRepository {
+impl SQLTransactionRepository {
     pub async fn new() -> Result<Self> {
-        let path = get_env(DATABASE_PATH_VAR, "./data/database.db");
+        let default_path = env::current_dir()
+            .expect("Failed to get current directory")
+            .join("data/database.db")
+            .to_str()
+            .expect("Failed to convert path to string")
+            .to_string();
+        let connection_string: String = get_env(
+            DATABASE_CONNECTION_STRING_VAR,
+            &format!("sqlite:file:{}?mode=rwc", default_path),
+        );
 
-        // Format the connection string properly for SQLite
-        let connection_string = format!("sqlite:{}?mode=rwc", path);
+        if connection_string.contains(SQLITE_FILE_PREFIX) {
+            // Ensure the directory for the DB exists
+            if let Some(path) = connection_string
+                .strip_prefix(SQLITE_FILE_PREFIX)
+                .and_then(|s| s.split('?').next())
+                && let Some(dir) = Path::new(path).parent()
+            {
+                fs::create_dir_all(dir).ok();
+                info!("Ensured directory exists: {:?}", dir);
+            }
+        }
 
-        let pool = SqlitePool::connect(&connection_string)
-            .await
-            .map_err(|e| RepositoryError::InitializationError(e.to_string()))?;
+        let pool = AnyPool::connect(&connection_string).await.map_err(|e| {
+            RepositoryError::InitializationError(format!(
+                "unable to open with connection string {}: {}",
+                connection_string, e
+            ))
+        })?;
 
-        info!("SQLite database {} connection pool created", path);
+        info!("Database {} connection pool created", connection_string);
 
-        let mut repo = Self {
-            pool,
-            initialized: false,
-        };
+        let mut repo = Self { pool };
 
         // Auto-initialize with default mode
         repo.initialize().await?;
@@ -42,10 +64,6 @@ impl SQLiteTransactionRepository {
     }
 
     async fn initialize_with_mode(&mut self, mode: MigrationMode) -> Result<()> {
-        if self.initialized {
-            return Ok(());
-        }
-
         match mode {
             MigrationMode::CreateIfNotExists => {
                 info!("Initializing database with CREATE IF NOT EXISTS mode");
@@ -58,8 +76,6 @@ impl SQLiteTransactionRepository {
                 self.drop_and_recreate_tables().await?;
             }
         }
-
-        self.initialized = true;
         info!("Database initialization complete");
         Ok(())
     }
@@ -113,7 +129,7 @@ impl SQLiteTransactionRepository {
     }
 }
 
-impl TransactionRepository for SQLiteTransactionRepository {
+impl TransactionRepository for SQLTransactionRepository {
     async fn initialize(&mut self) -> Result<()> {
         // Choose migration mode based on environment variable
         let mode = match get_env(DATABASE_MIGRATION_MODE_VAR, "").as_str() {
@@ -138,10 +154,9 @@ impl TransactionRepository for SQLiteTransactionRepository {
             .execute(&self.pool)
             .await
             .map_err(RepositoryError::SqlExecutionError)?;
-
-        let id = result.last_insert_rowid();
+        let id = result.last_insert_id();
         Ok(Transaction {
-            id: Some(id),
+            id,
             prompt: t.prompt,
             response: t.response,
             model_name: t.model_name,

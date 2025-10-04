@@ -92,7 +92,7 @@ Configure the service using environment variables:
 ### Database Configuration
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DATABASE_PATH` | SQLite database file path | `/runtime/database.db` |
+| `DATABASE_CONNECTION_STRING_VAR` | Database connection string to use | `sqlite:file:$PWD/data/database.db?mode=rwc` |
 | `DATABASE_MIGRATION_MODE` | Migration strategy | `create_if_not_exists` |
 
 ### Migration Modes
@@ -277,7 +277,7 @@ DATABASE_MIGRATION_MODE=create_if_not_exists cargo run
 DATABASE_MIGRATION_MODE=drop_recreate cargo run
 
 # Custom database path
-DATABASE_PATH=./custom.db cargo run
+DATABASE_CONNECTION_STRING_VAR=sqlite://./custom.db cargo run
 ```
 
 ## Contributing

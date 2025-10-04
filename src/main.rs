@@ -1,4 +1,5 @@
 use inference_gateway::{router, server::Server};
+use sqlx::any;
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 #[tokio::main]
@@ -11,6 +12,8 @@ async fn main() {
         )
         .with(fmt::layer().compact())
         .init();
+
+    any::install_default_drivers();
 
     let addr = "0.0.0.0:3000";
     let mut srv = Server::default();
