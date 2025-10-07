@@ -56,12 +56,12 @@ impl TextGenerationParameters {
     }
 }
 
-pub struct LLM {
+pub struct LLMService {
     model: AutoRegressiveModel,
     tokenizer: Tokenizer,
 }
 
-impl LLM {
+impl LLMService {
     pub fn new(model: AutoRegressiveModel, tokenizer: Tokenizer) -> Self {
         Self { model, tokenizer }
     }

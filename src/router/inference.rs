@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::{
-    inference::llm::{ChatRequest, LLM, Message, TextGenerationParameters},
+    services::llm::{ChatRequest, LLMService, Message, TextGenerationParameters},
     repository::models::Transaction,
     repository::sql::SQLTransactionRepository,
     services::transactions::TransactionService,
@@ -101,7 +101,7 @@ pub struct PostInferenceResponse {
 /// }
 /// ```
 pub async fn post_inference(
-    Extension(llm): Extension<Arc<Mutex<LLM>>>,
+    Extension(llm): Extension<Arc<Mutex<LLMService>>>,
     Extension(svc): Extension<Arc<TransactionService<SQLTransactionRepository>>>,
     Json(req): Json<PostInferenceRequest>,
 ) -> (StatusCode, Json<Value>) {

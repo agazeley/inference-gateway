@@ -5,8 +5,8 @@ use minijinja::{Environment, context};
 
 use crate::inference::{
     errors::{InferenceError, Result},
-    llm::ChatRequest,
 };
+use crate::services::llm::ChatRequest;
 
 /*
 Some good docs:
