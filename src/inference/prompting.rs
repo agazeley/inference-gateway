@@ -3,10 +3,8 @@ use std::path::PathBuf;
 use hf_hub::api::sync::Api;
 use minijinja::{Environment, context};
 
-use crate::inference::{
-    errors::{InferenceError, Result},
-    llm::ChatRequest,
-};
+use crate::inference::errors::{InferenceError, Result};
+use crate::services::llm::ChatRequest;
 
 /*
 Some good docs:

@@ -10,13 +10,12 @@ use crate::inference::tokenization::{Tokenizer, TokenizerConfig};
 use crate::utils::get_env;
 
 pub mod errors;
-pub mod llm;
+pub mod model;
 pub mod prompting;
+pub mod tokenization;
 
 mod inputs;
-mod model;
 mod tensors;
-mod tokenization;
 
 const DEFAULT_MODEL_NAME_VAR: &str = "INFERENCE_DEFAULT_MODEL_NAME";
 const DEFAULT_HF_MODEL_ID: &str = "INFERENCE_DEFAULT_HF_MODEL_ID";
