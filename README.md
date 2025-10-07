@@ -8,11 +8,17 @@ Inference Gateway provides a scalable HTTP API for text generation with enterpri
 
 ## Architecture
 
+This project uses a **hybrid library + binary structure** optimized for both development and production deployment:
+
+### Project Structure
+- **`src/lib.rs`**: Core library (`inference_gateway`) with reusable components
+- **`src/bin/server.rs`**: Main HTTP server binary (`inference-gateway`)
 - **API Layer**: Axum-based HTTP service with JSON request/response handling
 - **Inference Engine**: ONNX Runtime integration with autoregressive model support and KV-caching
-- **Data Layer**: SQLite-based persistent storage with configurable migrations
+- **Data Layer**: SQLite-based persistent storage with async transaction logging
+- **Repository Pattern**: Abstracted database operations with trait-based architecture
 - **Observability**: Prometheus metrics, structured logging, and distributed tracing
-- **Concurrency**: Thread-safe model sharing with async request handling
+- **Concurrency**: Optimized database connection pooling and background transaction processing
 - **Deployment**: Docker and Docker Compose support with multi-stage builds
 
 ## Features
@@ -56,16 +62,26 @@ docker compose up --build -d
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-### Running
+### Building and Running
+
 ```bash
-# Build the project
+# Build the library and server binary
 cargo build --release
 
-# Run with default configuration
+# Run the main server binary
+cargo run --bin inference-gateway --release
+
+# Or use the shorter form (since it's the default binary)
 cargo run --release
 
 # Run with custom database configuration
 DATABASE_MIGRATION_MODE=create_if_not_exists cargo run --release
+
+# Build only the library (for testing/development)
+cargo build --lib
+
+# Run library tests
+cargo test --lib
 ```
 
 The service starts on `0.0.0.0:3000` by default.
@@ -209,7 +225,7 @@ cargo fmt
 cargo check
 cargo clippy --fix --allow-dirty
 
-# Testing
+# Testing (library and binary)
 cargo test
 
 # Integration tests

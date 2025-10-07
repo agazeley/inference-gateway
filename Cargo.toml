@@ -3,10 +3,19 @@ name = "inference-gateway"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "inference-gateway"
+path = "src/bin/server.rs"
+
+[lib]
+name = "inference_gateway"
+path = "src/lib.rs"
+
 [dependencies]
 async-trait = "0.1.83"
 axum = "0.8.4"
 axum-prometheus = "0.9.0"
+clap = { version = "4.5.48", features = ["derive"] }
 env_logger = "0.11.8"
 half = "2.6.0"
 hf-hub = { version = "0.4.3", features = ["tokio"] }
