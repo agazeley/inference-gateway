@@ -1,4 +1,3 @@
 # - use the git CLI credentials to fetch crates that specify 'git' as the source
 [net]
 git-fetch-with-cli = true
-
