@@ -7,7 +7,7 @@ use serde_json::Value;
 
 use crate::inference::{
     errors::{InferenceError, Result},
-    model::AutoRegressiveModel,
+    autoregressive::AutoRegressiveModel,
     tokenization::Tokenizer,
 };
 
@@ -88,7 +88,7 @@ impl LLMService {
         debug!("Generating from: {:?}", params);
         debug!("Input: {:?}", input);
         let max_tokens = params.max_tokens.unwrap_or(DEFAULT_MAX_TOKENS);
-        let min_p = self.model.generate_cfg.min_p.unwrap_or(DEFAULT_MIN_P);
+        // let min_p = self.model.generate_cfg.min_p.unwrap_or(DEFAULT_MIN_P);
         let temperature = params.temperature.unwrap_or(
             self.model
                 .generate_cfg
@@ -101,50 +101,8 @@ impl LLMService {
         let top_p = params
             .top_p
             .unwrap_or(self.model.generate_cfg.top_p.unwrap_or(DEFAULT_TOP_P));
-
-        self.generate_inner(input, max_tokens, min_p, temperature, top_k, top_p)
-    }
-
-    fn generate_inner(
-        &mut self,
-        input: String,
-        max_tokens: i32,
-        min_p: f32,
-        temperature: f32,
-        top_k: i64,
-        top_p: f32,
-    ) -> Result<String> {
-        let mut input_tokens = self.tokenize_input(&input)?;
-        let mut generated_tokens = Vec::new();
-        let mut rng = rand::rng();
-        for _ in 0..max_tokens {
-            let output = self.model.run(&input_tokens)?; // TODO: this probaby will not work
-            let logits = output.logits()?;
-            let tokens = self.process_logits(logits, temperature, top_p)?;
-            if tokens.is_empty() {
-                break;
-            }
-            let top_k_size = top_k.min(tokens.len() as i64);
-            let selected = tokens[rng.random_range(0..top_k_size as usize)];
-            let token = selected.0 as i64;
-            let probability = selected.1;
-            if probability < min_p {
-                debug!(
-                    "Improbable token generated (token={}, prob={}, count={})",
-                    token,
-                    probability,
-                    generated_tokens.len()
-                );
-                // continue;
-            }
-
-            if self.end_of_sequence(token) {
-                debug!("EOS found on token {}", generated_tokens.len());
-                break;
-            }
-            input_tokens.push(token);
-            generated_tokens.push(token as u32);
-        }
+        let input_tokens = self.tokenize_input(&input)?;
+        let generated_tokens = self.model.generate(input_tokens, max_tokens as i64, temperature, top_k, top_p)?;
         self.decode_output(&generated_tokens)
     }
 

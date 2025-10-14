@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::{
-    services::llm::{ChatRequest, LLMService, Message, TextGenerationParameters},
     repository::models::Transaction,
     repository::sql::SQLTransactionRepository,
+    services::llm::{ChatRequest, LLMService, Message, TextGenerationParameters},
     services::transactions::TransactionService,
 };
 

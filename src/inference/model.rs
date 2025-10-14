@@ -87,7 +87,7 @@ pub enum ModelLoadConfig {
 }
 
 impl ModelLoadConfig {
-    fn get_generation_config(self) -> Result<GenerationConfig> {
+    pub fn get_generation_config(self) -> Result<GenerationConfig> {
         match self {
             ModelLoadConfig::Remote(cfg) => GenerationConfig::from_hf(cfg.url),
             ModelLoadConfig::Hf(cfg) => GenerationConfig::from_hf(cfg.id),
@@ -97,7 +97,7 @@ impl ModelLoadConfig {
 }
 
 #[derive(Debug, Serialize)]
-pub struct AutoRegressiveModelConfig {
+pub struct ModelConfig {
     pub model_name: String,
     pub model_cfg: ModelLoadConfig,
     pub intra_threads: usize,
@@ -105,7 +105,7 @@ pub struct AutoRegressiveModelConfig {
     pub optimization_level: GraphOptimizationLevel,
 }
 
-impl Clone for AutoRegressiveModelConfig {
+impl Clone for ModelConfig {
     fn clone(&self) -> Self {
         Self {
             model_name: self.model_name.clone(),
@@ -121,7 +121,7 @@ impl Clone for AutoRegressiveModelConfig {
     }
 }
 
-impl AutoRegressiveModelConfig {
+impl ModelConfig {
     /// Builds a new inference session based on the current `AutoRegressiveModelConfig`.
     ///
     /// This method configures the session builder with the specified optimization level and intra-thread count.
@@ -187,7 +187,7 @@ impl AutoRegressiveModelConfig {
     }
 }
 
-impl Default for AutoRegressiveModelConfig {
+impl Default for ModelConfig {
     fn default() -> Self {
         Self {
             model_name: DEFAULT_MODEL_NAME.to_string(),
@@ -222,7 +222,7 @@ pub struct AutoRegressiveModel {
 ///   Builds input values, executes the session, and extracts the first output.
 ///   Returns the model output or an error if inference fails.
 impl AutoRegressiveModel {
-    pub fn new(cfg: AutoRegressiveModelConfig) -> Result<Self> {
+    pub fn new(cfg: ModelConfig) -> Result<Self> {
         let name = cfg.model_name.clone();
         let session = cfg.clone().build_session()?;
 

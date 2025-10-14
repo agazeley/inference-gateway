@@ -2,13 +2,13 @@ mod errors;
 mod inference;
 mod transactions;
 
-use crate::services::llm::LLMService;
 use crate::inference::{load_default_model, load_default_tokenizer};
 use crate::repository::TransactionRepository;
 use crate::repository::sql::SQLTransactionRepository;
 use crate::router::errors::ApiError;
 use crate::router::inference::post_inference;
 use crate::router::transactions::{get_transactions, post_transactions};
+use crate::services::llm::LLMService;
 use crate::services::transactions::TransactionService;
 
 use axum::routing::get;

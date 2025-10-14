@@ -3,17 +3,20 @@ use ort::session::builder::GraphOptimizationLevel;
 
 use crate::inference::errors::Result;
 use crate::inference::model::{
-    AutoRegressiveModel, AutoRegressiveModelConfig, HfModelLoadConfig, ModelLoadConfig,
+     HfModelLoadConfig, ModelConfig, ModelLoadConfig,
 };
+use crate::inference::autoregressive::AutoRegressiveModel;
 use crate::inference::prompting::{ChatTemplate, JinjaChatTemplate};
 use crate::inference::tokenization::{Tokenizer, TokenizerConfig};
 use crate::utils::get_env;
 
+pub mod autoregressive;
 pub mod errors;
 pub mod model;
 pub mod prompting;
 pub mod tokenization;
 
+mod cache;
 mod inputs;
 mod tensors;
 
@@ -33,7 +36,7 @@ pub fn load_default_model() -> Result<AutoRegressiveModel> {
         filename: model_filename,
     });
 
-    let cfg = AutoRegressiveModelConfig {
+    let cfg = ModelConfig {
         model_name: get_env(DEFAULT_MODEL_NAME_VAR, "gpt2"),
         model_cfg,
         intra_threads: 4,

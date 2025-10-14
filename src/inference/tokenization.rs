@@ -64,7 +64,6 @@ impl Tokenizer {
     }
 
     // Re-expose selected methods
-
     pub fn tokenize_to_ids(&self, text: &str) -> Result<Vec<u32>> {
         let enc: Encoding = self
             .inner
