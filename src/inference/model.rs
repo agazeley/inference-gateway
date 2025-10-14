@@ -49,8 +49,20 @@ impl GenerationConfig {
         Self::from_string(data)
     }
 
-    pub fn from_url(_url: String) -> Result<Self> {
-        Ok(Self::default()) // TODO: impl
+    pub fn from_url(url: String) -> Result<Self> {
+        let resp = reqwest::blocking::get(url).map_err(|e| {
+            InferenceError::ModelLoading(format!(
+                "Failed to download generation config file: {}",
+                e
+            ))
+        })?;
+        let data = resp.text().map_err(|e| {
+            InferenceError::ModelLoading(format!(
+                "Failed to get generation config string from response: {}",
+                e
+            ))
+        })?;
+        Self::from_string(data)
     }
 
     pub fn from_hf(model_id: String) -> Result<Self> {
