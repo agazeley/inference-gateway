@@ -60,21 +60,6 @@ pub const NO_OP: SimpleChatTemplate = SimpleChatTemplate {
     suffix: "",
 };
 
-pub const INSTRUCT: SimpleChatTemplate = SimpleChatTemplate {
-    prefix: "Instruct: ",
-    suffix: "\nOutput:",
-};
-
-pub const CHAT: SimpleChatTemplate = SimpleChatTemplate {
-    prefix: "User: ",
-    suffix: "\nAssistant:",
-};
-
-pub const QA: SimpleChatTemplate = SimpleChatTemplate {
-    prefix: "Question: ",
-    suffix: "\nAnswer:",
-};
-
 #[derive(Debug, Clone)]
 pub struct JinjaChatTemplate<'a> {
     name: String,

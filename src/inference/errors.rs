@@ -44,4 +44,7 @@ pub enum InferenceError {
     // Unsupported data type errors
     #[error("Unsupported data type: {0}")]
     UnsupportedDataType(String),
+
+    #[error("Cache error: {0}")]
+    CacheError(String),
 }

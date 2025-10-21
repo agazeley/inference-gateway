@@ -4,7 +4,7 @@ use serde_derive::Serialize;
 
 use crate::inference::{
     errors::{InferenceError, Result},
-    model::AutoRegressiveModel,
+    models::text_generation::TextGenerationModel,
     tokenization::Tokenizer,
 };
 
@@ -54,12 +54,12 @@ impl TextGenerationParameters {
 }
 
 pub struct LLMService {
-    model: AutoRegressiveModel,
+    model: TextGenerationModel,
     tokenizer: Tokenizer,
 }
 
 impl LLMService {
-    pub fn new(model: AutoRegressiveModel, tokenizer: Tokenizer) -> Self {
+    pub fn new(model: TextGenerationModel, tokenizer: Tokenizer) -> Self {
         Self { model, tokenizer }
     }
 

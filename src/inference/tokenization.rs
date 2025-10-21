@@ -1,6 +1,6 @@
 use crate::inference::{
     errors::{InferenceError, Result},
-    prompting::{CHAT, ChatTemplate},
+    prompting::{ChatTemplate, NO_OP},
 };
 use tokenizers::{Encoding, Tokenizer as TokenizerBase};
 
@@ -37,7 +37,7 @@ impl Tokenizer {
                 "missing tokenizer file or identifier".to_string(),
             ));
         }
-        let chat_template = chat_template.unwrap_or(Box::new(CHAT));
+        let chat_template = chat_template.unwrap_or(Box::new(NO_OP));
 
         if cfg.filepath.is_some() {
             let path = cfg.filepath.unwrap();
